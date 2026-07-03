@@ -2,76 +2,62 @@
 
 ## Русская Версия
 
-### [Скачать готовый EXE: MP3Ship.exe](dist/MP3Ship.exe)
+[English version](#english-version)
 
-MP3 Ship - автономное Windows-приложение для скачивания аудио с YouTube в MP3.
+### [Скачать MP3Ship.exe](dist/MP3Ship.exe)
 
-Что умеет приложение:
+MP3 Ship - автономное Windows-приложение для скачивания аудио с YouTube в MP3. Пользователь скачивает один `.exe` файл и запускает его без установки Python, FFmpeg, Deno, Node или дополнительных библиотек.
 
-- скачивает одно видео, несколько ссылок или плейлист YouTube;
-- принимает много ссылок сразу: по строкам, через пробел или списком из сообщения;
-- сохраняет результат в выбранную папку;
-- конвертирует аудио в `.mp3`;
-- позволяет выбрать качество MP3: `128`, `192`, `256`, `320`;
-- показывает журнал скачивания и конвертации;
-- поддерживает остановку текущего скачивания кнопкой `Остановить`;
-- поддерживает русский и английский интерфейс;
-- использует `cookies.txt`, если YouTube просит подтвердить, что вы не бот;
-- содержит внутри FFmpeg и Deno, поэтому пользователю не нужно ничего устанавливать.
+![Главное окно MP3 Ship](assets/screenshots/main-window.png)
 
-Пользователю нужен только файл:
-
-```text
-dist\MP3Ship.exe
-```
-
-### Как Пользоваться
+### Как Работает Для Пользователя
 
 1. Откройте `MP3Ship.exe`.
-2. Вставьте одну или несколько ссылок YouTube.
-3. Выберите папку для сохранения.
-4. Выберите качество MP3.
-5. При необходимости выберите `cookies.txt`.
+2. Вставьте одну или несколько ссылок YouTube в поле `Ссылки YouTube`.
+3. Выберите папку, куда сохранить готовые MP3-файлы.
+4. Выберите качество MP3: `128`, `192`, `256` или `320`.
+5. Если YouTube просит подтвердить, что вы не бот, выберите экспортированный `cookies.txt`.
 6. Нажмите `Скачать MP3`.
-7. Чтобы прервать процесс, нажмите `Остановить`.
+7. Следите за процессом в журнале внизу окна.
+8. Если нужно прервать процесс, нажмите `Остановить`.
 
-### Если YouTube Пишет, Что Вы Не Бот
+![Скачивание завершено](assets/screenshots/download-finished.png)
 
-Если появляется ошибка `Sign in to confirm you’re not a bot`, нажмите `Помощь с cookies`.
+### Что Умеет Приложение
 
-Общий порядок такой:
+- Скачивает одно видео, несколько ссылок или целый плейлист YouTube.
+- Принимает много ссылок сразу: по строкам, через пробел или списком из сообщения.
+- Сохраняет результат в выбранную пользователем папку.
+- Конвертирует скачанное аудио в `.mp3`.
+- Позволяет выбрать качество MP3.
+- Показывает журнал скачивания и конвертации.
+- Позволяет остановить текущее скачивание.
+- Поддерживает русский и английский интерфейс.
+- Запоминает уже скачанные видео в `.mp3ship_downloaded.txt` внутри выбранной папки и не скачивает их повторно, даже если MP3 потом удалить.
+- Очищает поле ссылок после успешного скачивания, чтобы старые ссылки случайно не запускались снова.
+- Использует `cookies.txt`, когда YouTube требует вход или проверку “not a bot”.
+- Содержит внутри FFmpeg для конвертации и Deno для решения YouTube JavaScript-подписей.
 
-1. Откройте YouTube в браузере и войдите в аккаунт.
-2. Установите расширение для экспорта cookies в формате `cookies.txt`.
-3. На сайте YouTube экспортируйте cookies в файл.
-4. В MP3 Ship нажмите `Выбрать` рядом с `cookies.txt` и укажите этот файл.
-5. Повторите скачивание.
+### Как Работает Внутри
 
-Это работает даже с открытым браузером: приложение читает выбранный файл `cookies.txt`, а не заблокированную базу Chrome/Edge.
+Приложение использует `yt-dlp` для получения аудио с YouTube. После скачивания встроенный FFmpeg конвертирует файл в MP3. Для новых YouTube-проверок подписи внутри exe также лежит Deno, поэтому пользователю не нужно отдельно устанавливать JavaScript runtime.
 
-### Почему Внутри Есть Deno
+Если YouTube требует авторизацию или проверку, приложение может использовать файл `cookies.txt`. Кнопка `Помощь с cookies` показывает понятную инструкцию: пользователь входит в YouTube в браузере, экспортирует cookies в файл и выбирает этот файл в MP3 Ship. Это работает даже с открытым браузером, потому что приложение читает обычный экспортированный файл, а не заблокированную базу Chrome или Edge.
 
-YouTube иногда требует решить JavaScript-подпись перед выдачей аудио. Если JavaScript runtime отсутствует, `yt-dlp` может видеть только изображения и писать `Signature solving failed` или `Only images are available`. В сборку встроен Deno, чтобы пользователь не устанавливал Node/Deno отдельно.
+![Помощь с cookies](assets/screenshots/cookies-help.png)
 
 ### Сборка Из Исходников
 
-Установите зависимости:
-
 ```powershell
 python -m pip install -r requirements.txt
+python -m PyInstaller --clean --noconfirm MP3Ship.spec
 ```
 
-Перед сборкой нужны:
+Для сборки должны существовать:
 
 ```text
 C:\ffmpeg\bin\ffmpeg.exe
 vendor\deno\deno.exe
-```
-
-Соберите exe:
-
-```powershell
-python -m PyInstaller --clean --noconfirm MP3Ship.spec
 ```
 
 Готовый файл появится здесь:
@@ -82,16 +68,14 @@ dist\MP3Ship.exe
 
 ### Командная Строка
 
-Скрипт тоже можно запускать напрямую:
-
 ```powershell
-python youtube_to_mp3.py "C:\Users\Rasul\Music" "https://www.youtube.com/watch?v=VIDEO_ID" --quality 320
+python youtube_to_mp3.py "C:\Users\User\Music" "https://www.youtube.com/watch?v=VIDEO_ID" --quality 320
 ```
 
 С cookies:
 
 ```powershell
-python youtube_to_mp3.py "C:\Users\Rasul\Music" "https://www.youtube.com/watch?v=VIDEO_ID" --cookies "C:\Users\Rasul\Downloads\cookies.txt"
+python youtube_to_mp3.py "C:\Users\User\Music" "https://www.youtube.com/watch?v=VIDEO_ID" --cookies "C:\Users\User\Downloads\cookies.txt"
 ```
 
 Используйте приложение только для своих видео, видео со свободной лицензией или контента, который вы имеете право скачивать.
@@ -100,27 +84,83 @@ python youtube_to_mp3.py "C:\Users\Rasul\Music" "https://www.youtube.com/watch?v
 
 ## English Version
 
-### [Download The Ready EXE: MP3Ship.exe](dist/MP3Ship.exe)
+[Русская версия](#русская-версия)
 
-MP3 Ship is a self-contained Windows app for downloading YouTube audio as MP3.
+### [Download MP3Ship.exe](dist/MP3Ship.exe)
 
-What it does:
+MP3 Ship is a self-contained Windows app for downloading YouTube audio as MP3. The user downloads one `.exe` file and runs it without installing Python, FFmpeg, Deno, Node, or extra libraries.
 
-- downloads one video, many links, or a YouTube playlist;
-- accepts many links at once;
-- saves MP3 files to a chosen folder;
-- lets the user choose MP3 quality;
-- shows a download and conversion log;
-- can stop the current download;
-- supports Russian and English;
-- accepts an exported `cookies.txt` when YouTube asks for bot confirmation;
-- bundles FFmpeg and Deno, so users do not install anything else.
+![MP3 Ship main window](assets/screenshots/main-window.png)
 
-Build output:
+### How It Works For The User
+
+1. Open `MP3Ship.exe`.
+2. Paste one or more YouTube links into the `YouTube links` field.
+3. Choose the folder where the finished MP3 files should be saved.
+4. Choose MP3 quality: `128`, `192`, `256`, or `320`.
+5. If YouTube asks to confirm that you are not a bot, choose an exported `cookies.txt` file.
+6. Press `Download MP3`.
+7. Watch download and conversion progress in the log at the bottom.
+8. Press `Stop` if you need to interrupt the current download.
+
+![Download finished](assets/screenshots/download-finished.png)
+
+### What The App Can Do
+
+- Downloads one video, several links, or a full YouTube playlist.
+- Accepts many links at once: line by line, separated by spaces, or pasted from a message.
+- Saves output into the folder selected by the user.
+- Converts downloaded audio to `.mp3`.
+- Lets the user choose MP3 quality.
+- Shows a download and conversion log.
+- Stops the current download on request.
+- Supports Russian and English UI.
+- Remembers already downloaded videos in `.mp3ship_downloaded.txt` inside the chosen folder and does not download them again, even if the MP3 file is deleted later.
+- Clears the links field after a successful download so old links are not accidentally started again.
+- Uses `cookies.txt` when YouTube requires sign-in or a “not a bot” check.
+- Bundles FFmpeg for conversion and Deno for YouTube JavaScript signature solving.
+
+### How It Works Internally
+
+The app uses `yt-dlp` to fetch audio from YouTube. After downloading, bundled FFmpeg converts the file to MP3. For modern YouTube signature checks, bundled Deno is included inside the exe, so the user does not need to install a JavaScript runtime separately.
+
+When YouTube requires sign-in or bot confirmation, the app can use a `cookies.txt` file. The `Cookies help` button shows a simple flow: sign in to YouTube in the browser, export cookies to a file, and select that file in MP3 Ship. This works even while the browser is open because the app reads the exported file instead of Chrome or Edge's locked cookie database.
+
+![Cookies help](assets/screenshots/cookies-help.png)
+
+### Build From Source
+
+```powershell
+python -m pip install -r requirements.txt
+python -m PyInstaller --clean --noconfirm MP3Ship.spec
+```
+
+These files must exist before building:
+
+```text
+C:\ffmpeg\bin\ffmpeg.exe
+vendor\deno\deno.exe
+```
+
+The built file will be created here:
 
 ```text
 dist\MP3Ship.exe
 ```
+
+### Command Line
+
+```powershell
+python youtube_to_mp3.py "C:\Users\User\Music" "https://www.youtube.com/watch?v=VIDEO_ID" --quality 320
+```
+
+With cookies:
+
+```powershell
+python youtube_to_mp3.py "C:\Users\User\Music" "https://www.youtube.com/watch?v=VIDEO_ID" --cookies "C:\Users\User\Downloads\cookies.txt"
+```
+
+Use the app only for your own videos, freely licensed videos, or content that you have the right to download.
 
 ## Author
 
