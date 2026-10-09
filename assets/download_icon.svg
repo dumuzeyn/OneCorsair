@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>OneCorsair — sail and sea</title>
+  <rect x="12" y="12" width="232" height="232" rx="60" fill="#1d4e89"/>
+  <path d="M147 46 C115 80 92 113 76 153 C100 143 124 142 147 146 Z" fill="#ffffff"/>
+  <path d="M62 184 C86 168 109 168 132 184 C155 200 177 200 198 184" fill="none" stroke="#f06585" stroke-width="16" stroke-linecap="round"/>
+</svg>

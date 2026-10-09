@@ -4,8 +4,17 @@
 a = Analysis(
     ['mp3_ship_gui.py'],
     pathex=[],
-    binaries=[('C:\\ffmpeg\\bin\\ffmpeg.exe', 'ffmpeg'), ('vendor\\deno\\deno.exe', 'deno')],
-    datas=[('assets\\mp3_ship_icon_exact.ico', 'assets'), ('assets\\mp3_ship_icon_exact.svg', 'assets')],
+    binaries=[
+        ('vendor\\yt-dlp\\yt-dlp.exe', 'yt-dlp'),
+    ],
+    datas=[
+        ('assets\\download_icon.ico', 'assets'),
+        ('assets\\download_icon.png', 'assets'),
+        ('assets\\download_icon.svg', 'assets'),
+        ('assets\\window-icons', 'assets/window-icons'),
+        ('vendor\\runtime-tools.zip', '.'),
+        ('vendor\\yt-dlp\\version.txt', 'yt-dlp'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -22,7 +31,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MP3Ship',
+    name='OneCorsair',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -35,5 +44,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['assets\\mp3_ship_icon_exact.ico'],
+    icon=['assets\\download_icon.ico'],
+    version='windows_version.txt',
 )

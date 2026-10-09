@@ -1,2 +1,2 @@
-yt-dlp[default]>=2025.1.15
 pyinstaller>=6.0
+pillow>=10

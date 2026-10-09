@@ -1,109 +1,161 @@
+import json
 import queue
 import re
 import sys
+import subprocess
 import threading
 import traceback
+import time
 import webbrowser
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from yt_dlp.utils import DownloadError
+from youtube_to_mp3 import (
+    DownloadCancelled, DownloadError, QUALITIES, VIDEO_HEIGHTS,
+    configure_bundled_ffmpeg, download_media, resource_path, update_engine,
+)
 
-from youtube_to_mp3 import configure_bundled_ffmpeg, download_mp3, resource_path
+
+from app_settings import load_settings, save_settings
 
 
-APP_NAME = "MP3 Ship"
-QUALITIES = ("128", "192", "256", "320")
+APP_NAME = "OneCorsair"
+MAX_LOG_LINES = 800
 URL_PATTERN = re.compile(r"https?://[^\s,;]+")
 
 I18N = {
     "en": {
         "language_button": "Русский",
-        "description": "Download YouTube videos and playlists as MP3 files in one self-contained Windows app.",
+        "links_hint": "Paste one or several video or playlist links.",
+        "activity": "Download activity",
+        "preferences_saved": "Your folder, quality and cookies file are remembered.",
+        "settings_error": "Could not save preferences: ",
+        "format_hint": "MP3 audio · MP4 video",
+        "idle_detail": "Waiting for a link",
+        "complete_detail": "Files are ready",
+        "progress_detail": "{percent} · {speed}",
+        "download": "↓ Download",
         "links": "YouTube links",
         "save_to": "Save to",
         "browse": "Browse",
-        "quality": "MP3 quality",
-        "cookies_file": "cookies.txt",
-        "choose_cookies": "Choose",
-        "clear_cookies": "Clear",
-        "cookies_help": "Cookies help",
-        "download": "Download MP3",
+        "mode": "Format",
+        "audio_mode": "Audio · MP3",
+        "video_mode": "Video + audio · MP4",
+        "quality": "MP3 bitrate",
+        "video_quality": "Maximum resolution",
+        "best_quality": "Best available",
+        "update": "Update yt-dlp",
         "stop": "Stop",
         "clear_log": "Clear log",
         "ready": "Ready",
-        "ready_log": "Ready. Paste one or many YouTube links, choose a folder, then press Download MP3.",
+        "ready_log": "Paste links, choose MP3 or MP4 and a folder, then press Download. If needed, select cookies.txt.",
+        "cookies_file": "cookies.txt (optional)",
+        "choose_cookies": "Choose",
+        "clear_cookies": "Clear",
+        "cookies_help": "Cookies help",
+        "cookies_help_title": "How to get cookies.txt",
+        "choose_cookies_file": "Choose cookies.txt",
+        "invalid_cookies": "The selected cookies.txt file does not exist. Choose an existing file or clear the field.",
+        "cookies_help_text": "1. Open YouTube in Chrome and sign in.\n2. Install a cookies.txt exporter from the Chrome Web Store.\n3. On youtube.com, export cookies in Netscape cookies.txt format.\n4. Press Choose beside cookies.txt and select the exported file.\n\nAfter closing this tip, YouTube and the extension store will open in your browser. Leave the cookies field empty to download without cookies.",
         "missing_links": "Paste at least one YouTube link.",
         "missing_output": "Choose an output folder.",
         "choose_output": "Choose output folder",
-        "choose_cookies_file": "Choose cookies.txt",
-        "cookies_help_title": "How to get cookies.txt",
-        "cookies_help_text": "1. Open YouTube in Chrome and sign in.\n2. Install a cookies.txt exporter extension from the Chrome Web Store.\n3. On youtube.com, export cookies as cookies.txt.\n4. In MP3 Ship, press Choose near cookies.txt and select that file.\n\nThis works while the browser is open because the app reads the exported file, not Chrome's locked database.",
         "downloading": "Downloading...",
         "starting": "Starting download...",
         "stopping": "Stopping...",
         "stopped": "Download stopped.",
         "done": "Done.",
-        "finished_with_errors": "Finished with failed item(s). If YouTube asks to confirm you are not a bot, choose the browser where you are signed in to YouTube and try again.",
         "download_error": "Download error: ",
-        "bot_hint": "YouTube asked to confirm you are not a bot. Use Cookies help, export cookies.txt from a signed-in browser, choose that file in the app, and try again.",
+        "bot_hint": "YouTube requires confirmation or sign-in. Choose a cookies.txt file exported from a signed-in YouTube session and try again. If one is already selected, refresh that file.",
         "error": "Error:",
         "downloading_file": "Downloading",
-        "converting_file": "Converting",
-        "to_mp3": "to MP3...",
+        "processing_file": "Processing downloaded media...",
+        "checking_update": "Checking the latest yt-dlp nightly release...",
+        "installing_update": "Downloading yt-dlp {version} and checking SHA-256...",
+        "engine_ready": "yt-dlp {version} is ready.",
+        "update_unavailable": "Could not check/install the update: {error}. Using yt-dlp {version}.",
+        "saved_file": "Saved: {filename}",
+        "updating": "Updating yt-dlp...",
+        "updated": "yt-dlp is ready.",
+        "failed": "Finished with errors.",
+        "built_in": "bundled version",
     },
     "ru": {
         "language_button": "English",
-        "description": "Скачивает видео и плейлисты YouTube в MP3 внутри одного автономного Windows-приложения.",
+        "links_hint": "Вставьте одну или несколько ссылок на ролики или плейлисты.",
+        "activity": "Ход скачивания",
+        "preferences_saved": "Папка, качество и файл cookies запоминаются.",
+        "settings_error": "Не удалось сохранить настройки: ",
+        "format_hint": "MP3 — аудио · MP4 — видео",
+        "idle_detail": "Ожидание ссылки",
+        "complete_detail": "Файлы готовы",
+        "progress_detail": "{percent} · {speed}",
+        "download": "↓ Скачать",
         "links": "Ссылки YouTube",
         "save_to": "Сохранить в",
         "browse": "Обзор",
-        "quality": "Качество MP3",
-        "cookies_file": "cookies.txt",
-        "choose_cookies": "Выбрать",
-        "clear_cookies": "Очистить",
-        "cookies_help": "Помощь с cookies",
-        "download": "Скачать MP3",
+        "mode": "Формат",
+        "audio_mode": "Аудио · MP3",
+        "video_mode": "Видео со звуком · MP4",
+        "quality": "Битрейт MP3",
+        "video_quality": "Макс. разрешение",
+        "best_quality": "Лучшее доступное",
+        "update": "Обновить yt-dlp",
         "stop": "Остановить",
         "clear_log": "Очистить журнал",
         "ready": "Готово",
-        "ready_log": "Готово. Вставьте одну или много ссылок YouTube, выберите папку и нажмите Скачать MP3.",
+        "ready_log": "Вставьте ссылки, выберите MP3 или MP4 и папку, затем нажмите «Скачать». При необходимости выберите cookies.txt.",
+        "cookies_file": "cookies.txt (необяз.)",
+        "choose_cookies": "Выбрать",
+        "clear_cookies": "Очистить",
+        "cookies_help": "Помощь с cookies",
+        "cookies_help_title": "Как получить cookies.txt",
+        "choose_cookies_file": "Выберите cookies.txt",
+        "invalid_cookies": "Выбранный файл cookies.txt не существует. Выберите существующий файл или очистите поле.",
+        "cookies_help_text": "1. Откройте YouTube в Chrome и войдите в аккаунт.\n2. Установите расширение для экспорта cookies.txt из Chrome Web Store.\n3. На youtube.com экспортируйте cookies в формате Netscape cookies.txt.\n4. Нажмите «Выбрать» рядом с cookies.txt и укажите этот файл.\n\nПосле закрытия подсказки в браузере откроются YouTube и магазин расширений. Для скачивания без cookies оставьте поле пустым.",
         "missing_links": "Вставьте хотя бы одну ссылку YouTube.",
         "missing_output": "Выберите папку для сохранения.",
         "choose_output": "Выберите папку для сохранения",
-        "choose_cookies_file": "Выберите cookies.txt",
-        "cookies_help_title": "Как получить cookies.txt",
-        "cookies_help_text": "1. Откройте YouTube в Chrome и войдите в аккаунт.\n2. Установите расширение для экспорта cookies.txt из Chrome Web Store.\n3. На сайте youtube.com экспортируйте cookies в файл cookies.txt.\n4. В MP3 Ship нажмите Выбрать рядом с cookies.txt и укажите этот файл.\n\nЭто работает с открытым браузером, потому что приложение читает экспортированный файл, а не заблокированную базу Chrome.",
         "downloading": "Скачивание...",
         "starting": "Запуск скачивания...",
         "stopping": "Остановка...",
         "stopped": "Скачивание остановлено.",
         "done": "Готово.",
-        "finished_with_errors": "Завершено с ошибками. Если YouTube просит подтвердить, что вы не бот, выберите браузер, где выполнен вход в YouTube, и попробуйте снова.",
         "download_error": "Ошибка скачивания: ",
-        "bot_hint": "YouTube попросил подтвердить, что вы не бот. Нажмите Помощь с cookies, экспортируйте cookies.txt из браузера с входом в YouTube, выберите этот файл в приложении и попробуйте снова.",
+        "bot_hint": "YouTube требует подтверждение или вход. Выберите cookies.txt, экспортированный из браузера с входом в YouTube, и попробуйте снова. Если файл уже выбран, обновите его.",
         "error": "Ошибка:",
         "downloading_file": "Скачивается",
-        "converting_file": "Конвертация",
-        "to_mp3": "в MP3...",
+        "processing_file": "Обработка скачанных файлов...",
+        "checking_update": "Проверка последней версии yt-dlp nightly...",
+        "installing_update": "Скачивание yt-dlp {version} и проверка SHA-256...",
+        "engine_ready": "yt-dlp {version} готов к работе.",
+        "update_unavailable": "Не удалось проверить/установить обновление: {error}. Используется yt-dlp {version}.",
+        "saved_file": "Сохранено: {filename}",
+        "updating": "Обновление yt-dlp...",
+        "updated": "yt-dlp готов к работе.",
+        "failed": "Завершено с ошибками.",
+        "built_in": "встроенная версия",
     },
 }
 
 COLORS = {
-    "bg": "#101418",
-    "panel": "#171e24",
-    "field": "#202a32",
-    "border": "#34414b",
-    "text": "#f4f7f8",
-    "muted": "#aebbc3",
-    "accent": "#19a7a8",
-    "accent_hot": "#22c6bd",
-    "button": "#22313a",
-    "button_active": "#2d444e",
-    "error": "#ff756e",
+    "bg": "#fff5f9",
+    "panel": "#ffffff",
+    "field": "#f8faff",
+    "border": "#dce5f2",
+    "text": "#203659",
+    "muted": "#697b98",
+    "accent": "#e62c54",
+    "accent_hot": "#fa426b",
+    "button": "#ffe8f0",
+    "button_active": "#ffd5e4",
+    "error": "#cd2548",
+    "blue": "#2d61dd",
+    "blue_soft": "#edf3ff",
+    "pink": "#f9a2c3",
+    "shadow": "#f0e5ed",
 }
-
 
 def enable_high_dpi():
     if sys.platform != "win32":
@@ -117,6 +169,21 @@ def enable_high_dpi():
             ctypes.windll.user32.SetProcessDPIAware()
     except Exception:
         pass
+
+
+def desktop_work_area(window):
+    """Keep the initial window inside the desktop area above the taskbar."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            area = wintypes.RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(area), 0):
+                return area.left, area.top, area.right, area.bottom
+        except (AttributeError, OSError):
+            pass
+    return 0, 0, window.winfo_screenwidth(), window.winfo_screenheight()
 
 
 class GuiLogger:
@@ -133,25 +200,96 @@ class GuiLogger:
         self.log_queue.put(message + "\n")
 
 
+class RoundedCard(tk.Canvas):
+    """A light native Tk card; no web engine or extra UI dependency."""
+
+    def __init__(self, parent, padding=20, **kwargs):
+        super().__init__(parent, bg=COLORS["bg"], highlightthickness=0, borderwidth=0, **kwargs)
+        self.padding = padding
+        self.content = ttk.Frame(self, style="Panel.TFrame")
+        self.window = self.create_window(padding, padding, anchor="nw", window=self.content)
+        self.bind("<Configure>", self._resize)
+        self.content.bind("<Configure>", self._content_size)
+        self._natural_height = 0
+
+    def _content_size(self, _event=None):
+        height = self.content.winfo_reqheight() + self.padding * 2 + 4
+        if height != self._natural_height:
+            self._natural_height = height
+            self.configure(height=height)
+
+    def set_padding(self, padding):
+        self.padding = padding
+        self.coords(self.window, padding, padding)
+        self._natural_height = 0
+        self._content_size()
+        self._resize()
+
+    def _resize(self, event=None):
+        width = event.width if event is not None else self.winfo_width()
+        height = event.height if event is not None else self.winfo_height()
+        self.itemconfigure(self.window, width=max(1, width - self.padding * 2),
+                           height=max(1, height - self.padding * 2 - 4))
+        self.delete("card")
+        for x, y, right, bottom, color in (
+            (2, 4, width - 2, height - 1, COLORS["shadow"]),
+            (0, 0, width, height - 5, COLORS["panel"]),
+        ):
+            radius = min(22, max(2, min(right - x, bottom - y) / 4))
+            points = (x + radius, y, right - radius, y, right, y, right, y + radius,
+                      right, bottom - radius, right, bottom, right - radius, bottom,
+                      x + radius, bottom, x, bottom, x, bottom - radius, x, y + radius, x, y)
+            self.create_polygon(points, fill=color, outline="", smooth=True, splinesteps=24, tags="card")
+        self.tag_lower("card")
+
+
 class MP3ShipApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, settings_path=None):
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("OneCorsair.Downloader")
+            except (AttributeError, OSError):
+                pass
         super().__init__()
+        self.withdraw()
         self.title(APP_NAME)
-        self.minsize(960, 700)
-        self.geometry("1000x760")
+        left, top, right, bottom = desktop_work_area(self)
+        width, height = min(800, right - left - 40), min(640, bottom - top - 60)
+        self.minsize(min(740, width), min(620, height))
+        self.geometry(f"{width}x{height}")
         self.configure(bg=COLORS["bg"])
 
-        icon = resource_path("assets/mp3_ship_icon_exact.ico")
+        icon = resource_path("assets/download_icon.ico")
         if icon.exists():
-            self.iconbitmap(str(icon))
+            self.iconbitmap(default=str(icon))
+        self._window_icon_sizes = []
+        for size in (256, 128, 96, 64, 48, 40, 32, 28, 24, 20, 16):
+            frame = resource_path(f"assets/window-icons/icon-{size}.png")
+            if frame.exists():
+                self._window_icon_sizes.append(tk.PhotoImage(file=str(frame)))
+        if self._window_icon_sizes:
+            self.iconphoto(True, *self._window_icon_sizes)
 
-        self.urls_var = tk.StringVar()
-        self.output_var = tk.StringVar(value=str(Path.home() / "Music"))
-        self.quality_var = tk.StringVar(value="192")
-        self.cookies_file_var = tk.StringVar()
-        self.language = "ru"
+        self.settings_path = settings_path
+        preferences = load_settings(settings_path)
+        self.output_var = tk.StringVar(value=preferences["output"])
+        self.quality_var = tk.StringVar(value=preferences["quality"])
+        self.cookies_file_var = tk.StringVar(value=preferences["cookies"])
+        self.mode = preferences["mode"]
+        self.mode_var = tk.StringVar()
+        self.height_var = tk.StringVar(value=preferences["height"])
+        self.video_quality_var = tk.StringVar(value="1080p")
+        self.closing = False
+        self.language = preferences["language"]
         self.localized_widgets = []
         self.status_var = tk.StringVar()
+        self.detail_var = tk.StringVar()
+        self._progress_lock = threading.Lock()
+        self._latest_progress = None
+        self._settings_warning_shown = False
+        self._log_lines = 0
         self.worker = None
         self.cancel_event = threading.Event()
         self.log_queue = queue.Queue()
@@ -159,8 +297,14 @@ class MP3ShipApp(tk.Tk):
         self._configure_style()
         self._bind_edit_shortcuts()
         self._build_ui()
+        self._compact = None
+        self.bind("<Configure>", self._resize_window, add="+")
         self._apply_language(clear_log=True)
+        self.update_idletasks()
+        self.geometry(f"+{left + (right - left - width) // 2}+{top + (bottom - top - height) // 2}")
+        self.deiconify()
         self.after(100, self._drain_log_queue)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def t(self, key):
         return I18N[self.language][key]
@@ -168,133 +312,176 @@ class MP3ShipApp(tk.Tk):
     def _configure_style(self):
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
-        self.style.configure(".", background=COLORS["bg"], foreground=COLORS["text"])
-        self.style.configure("TFrame", background=COLORS["bg"])
-        self.style.configure("Panel.TFrame", background=COLORS["panel"])
-        self.style.configure("TLabel", background=COLORS["bg"], foreground=COLORS["text"], font=("Segoe UI", 10))
-        self.style.configure("Muted.TLabel", background=COLORS["bg"], foreground=COLORS["muted"], font=("Segoe UI", 10))
-        self.style.configure("Title.TLabel", background=COLORS["bg"], foreground=COLORS["text"], font=("Segoe UI", 24, "bold"))
-        self.style.configure("TButton", background=COLORS["button"], foreground=COLORS["text"], borderwidth=1, padding=(12, 8), font=("Segoe UI", 10))
-        self.style.map("TButton", background=[("active", COLORS["button_active"]), ("pressed", COLORS["accent"])])
-        self.style.configure("Accent.TButton", background=COLORS["accent"], foreground="#ffffff", font=("Segoe UI", 10, "bold"))
-        self.style.map("Accent.TButton", background=[("active", COLORS["accent_hot"]), ("pressed", "#11888d")])
-        self.style.configure("TEntry", fieldbackground=COLORS["field"], foreground=COLORS["text"], insertcolor=COLORS["text"], bordercolor=COLORS["border"], padding=6)
-        self.style.configure("TCombobox", fieldbackground=COLORS["field"], foreground=COLORS["text"], arrowcolor=COLORS["accent"], bordercolor=COLORS["border"], padding=6)
-        self.style.map("TCombobox", fieldbackground=[("readonly", COLORS["field"])], foreground=[("readonly", COLORS["text"])])
-        self.style.configure("Horizontal.TProgressbar", background=COLORS["accent"], troughcolor=COLORS["field"], bordercolor=COLORS["border"])
+        self.style.configure(".", background=COLORS["bg"], foreground=COLORS["text"], font=("Segoe UI", 10))
+        for name, background in (("TFrame", COLORS["bg"]), ("Panel.TFrame", COLORS["panel"]),
+                                 ("Soft.TFrame", COLORS["blue_soft"])):
+            self.style.configure(name, background=background)
+        self.style.configure("TLabel", background=COLORS["bg"], foreground=COLORS["text"])
+        self.style.configure("Muted.TLabel", foreground=COLORS["muted"], background=COLORS["bg"])
+        self.style.configure("Panel.TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=("Segoe UI", 10, "bold"))
+        self.style.configure("PanelMuted.TLabel", background=COLORS["panel"], foreground=COLORS["muted"], font=("Segoe UI", 9))
+        self.style.configure("Activity.TLabel", background=COLORS["panel"], foreground=COLORS["blue"], font=("Segoe UI", 11, "bold"))
+        self.style.configure("Badge.TLabel", background=COLORS["blue_soft"], foreground=COLORS["blue"], padding=(12, 6), font=("Segoe UI", 9, "bold"))
+        self.style.configure("TButton", background=COLORS["button"], foreground=COLORS["accent"], borderwidth=0,
+                             padding=(11, 6), font=("Segoe UI", 10, "bold"), focuscolor=COLORS["button"])
+        self.style.map("TButton", background=[("disabled", "#f2edf2"), ("pressed", "#ffc5d8"), ("active", COLORS["button_active"])],
+                       foreground=[("disabled", "#a49bac")])
+        self.style.configure("Blue.TButton", background=COLORS["blue_soft"], foreground=COLORS["blue"])
+        self.style.map("Blue.TButton", background=[("disabled", "#eef0f5"), ("active", "#dce8ff")],
+                       foreground=[("disabled", "#a0acc1")])
+        self.style.configure("Link.TButton", background=COLORS["panel"], foreground=COLORS["blue"], padding=(2, 4),
+                             font=("Segoe UI", 9))
+        self.style.map("Link.TButton", background=[("active", COLORS["blue_soft"])])
+        self.style.configure("Accent.TButton", background=COLORS["accent"], foreground="#ffffff", padding=(20, 9),
+                             font=("Segoe UI", 11, "bold"), focuscolor=COLORS["accent"])
+        self.style.map("Accent.TButton", background=[("disabled", "#f1b4c5"), ("active", COLORS["accent_hot"]), ("pressed", "#c91c43")],
+                       foreground=[("disabled", "#ffffff")])
+        self.style.configure("TEntry", fieldbackground=COLORS["field"], foreground=COLORS["text"],
+                             insertcolor=COLORS["blue"], bordercolor=COLORS["border"], lightcolor=COLORS["border"],
+                             darkcolor=COLORS["border"], padding=(9, 6))
+        self.style.map("TEntry", bordercolor=[("focus", COLORS["blue"])], fieldbackground=[("disabled", "#f2f4f8")])
+        self.style.configure("TCombobox", fieldbackground=COLORS["field"], background=COLORS["field"],
+                             foreground=COLORS["text"], arrowcolor=COLORS["blue"], bordercolor=COLORS["border"],
+                             lightcolor=COLORS["border"], darkcolor=COLORS["border"], padding=(9, 6))
+        self.style.map("TCombobox", fieldbackground=[("readonly", COLORS["field"]), ("disabled", "#f2f4f8")],
+                       foreground=[("readonly", COLORS["text"]), ("disabled", COLORS["muted"])],
+                       bordercolor=[("focus", COLORS["blue"])])
+        self.style.configure("Horizontal.TProgressbar", background=COLORS["accent"], troughcolor=COLORS["blue_soft"],
+                             bordercolor=COLORS["blue_soft"], lightcolor=COLORS["blue_soft"],
+                             darkcolor=COLORS["blue_soft"], borderwidth=0, thickness=7)
+        self.style.configure("Vertical.TScrollbar", background=COLORS["blue_soft"], troughcolor=COLORS["panel"],
+                             arrowcolor=COLORS["blue"], bordercolor=COLORS["panel"], lightcolor=COLORS["panel"],
+                             darkcolor=COLORS["panel"], borderwidth=0)
+        self.style.map("Vertical.TScrollbar", background=[("active", "#dce8ff"), ("!active", COLORS["blue_soft"])])
+        self.option_add("*TCombobox*Listbox.background", "#ffffff")
+        self.option_add("*TCombobox*Listbox.foreground", COLORS["text"])
+        self.option_add("*TCombobox*Listbox.selectBackground", COLORS["blue"])
+
+    def _localized(self, parent, key, style="Panel.TLabel", **kwargs):
+        widget = ttk.Label(parent, style=style, **kwargs)
+        self.localized_widgets.append((widget, key))
+        return widget
 
     def _build_ui(self):
-        root = ttk.Frame(self, padding=20)
+        root = ttk.Frame(self, padding=(14, 12))
+        self.root_frame = root
         root.pack(fill=tk.BOTH, expand=True)
         root.columnconfigure(0, weight=1)
-        root.rowconfigure(3, weight=1)
+        root.rowconfigure(2, weight=1)
 
-        header = ttk.Frame(root)
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 18))
-        header.columnconfigure(0, weight=1)
-        ttk.Label(header, text=APP_NAME, style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        self.description_label = ttk.Label(
-            header,
-            style="Muted.TLabel",
-            wraplength=840,
-        )
-        self.description_label.grid(row=1, column=0, sticky="w", pady=(4, 0))
-        self.localized_widgets.append((self.description_label, "description"))
-        self.language_button = ttk.Button(header, command=self._toggle_language)
-        self.language_button.grid(row=0, column=1, sticky="ne", padx=(12, 0))
-        self.localized_widgets.append((self.language_button, "language_button"))
-
-        form = ttk.Frame(root, style="Panel.TFrame", padding=16)
-        form.grid(row=1, column=0, sticky="ew")
+        self.form_card = RoundedCard(root, padding=14)
+        self.form_card.grid(row=0, column=0, sticky="ew")
+        form = self.form_card.content
+        form.columnconfigure(0, weight=1)
         form.columnconfigure(1, weight=1)
 
-        self.links_label = ttk.Label(form, background=COLORS["panel"])
-        self.links_label.grid(row=0, column=0, sticky="nw", pady=(2, 8))
-        self.localized_widgets.append((self.links_label, "links"))
-        self.urls_text = tk.Text(
-            form,
-            height=6,
-            wrap="word",
-            undo=True,
-            bg=COLORS["field"],
-            fg=COLORS["text"],
-            insertbackground=COLORS["text"],
-            relief="solid",
-            borderwidth=1,
-            highlightthickness=1,
-            highlightbackground=COLORS["border"],
-            font=("Segoe UI", 10),
-        )
-        self.urls_text.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(12, 0), pady=(0, 10))
+        self.links_label = self._localized(form, "links")
+        self.links_label.grid(row=0, column=0, sticky="w", pady=(0, 4))
+        self.language_button = ttk.Button(form, command=self._toggle_language, style="Link.TButton")
+        self.language_button.grid(row=0, column=1, sticky="e", pady=(0, 4))
+        self.localized_widgets.append((self.language_button, "language_button"))
+        self.urls_text = tk.Text(form, height=2, wrap="word", undo=True, bg=COLORS["field"], fg=COLORS["text"],
+                                insertbackground=COLORS["blue"], relief="flat", borderwidth=0,
+                                highlightthickness=1, highlightbackground=COLORS["border"], highlightcolor=COLORS["blue"],
+                                padx=10, pady=6, font=("Segoe UI", 10))
+        self.urls_text.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self.links_hint_label = self._localized(form, "links_hint", "PanelMuted.TLabel")
+        self.links_hint_label.grid(row=2, column=0, columnspan=2, sticky="w", pady=(3, 7))
 
-        self.save_to_label = ttk.Label(form, background=COLORS["panel"])
-        self.save_to_label.grid(row=1, column=0, sticky="w", pady=6)
-        self.localized_widgets.append((self.save_to_label, "save_to"))
-        ttk.Entry(form, textvariable=self.output_var).grid(row=1, column=1, sticky="ew", padx=(12, 8), pady=6)
-        self.browse_button = ttk.Button(form, command=self._choose_output)
-        self.browse_button.grid(row=1, column=2, sticky="e", pady=6)
+        self.save_to_label = self._localized(form, "save_to")
+        self.save_to_label.grid(row=3, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        destination = ttk.Frame(form, style="Panel.TFrame")
+        self.destination_frame = destination
+        destination.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        destination.columnconfigure(0, weight=1)
+        self.output_entry = ttk.Entry(destination, textvariable=self.output_var)
+        self.output_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.output_entry.bind("<FocusOut>", self._save_preferences)
+        self.browse_button = ttk.Button(destination, command=self._choose_output, style="Blue.TButton")
+        self.browse_button.grid(row=0, column=1)
         self.localized_widgets.append((self.browse_button, "browse"))
 
-        self.quality_label = ttk.Label(form, background=COLORS["panel"])
-        self.quality_label.grid(row=2, column=0, sticky="w", pady=6)
-        self.localized_widgets.append((self.quality_label, "quality"))
-        ttk.Combobox(form, textvariable=self.quality_var, values=QUALITIES, state="readonly", width=12).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=6)
+        self.mode_label = self._localized(form, "mode")
+        self.mode_label.grid(row=5, column=0, sticky="w", pady=(0, 4))
+        self.quality_label = ttk.Label(form, style="Panel.TLabel")
+        self.quality_label.grid(row=5, column=1, sticky="w", padx=(12, 0), pady=(0, 4))
+        self.mode_combo = ttk.Combobox(form, textvariable=self.mode_var, state="readonly", width=28)
+        self.mode_combo.grid(row=6, column=0, sticky="ew", pady=(0, 8))
+        self.mode_combo.bind("<<ComboboxSelected>>", self._change_mode)
+        self.quality_combo = ttk.Combobox(form, textvariable=self.quality_var, values=QUALITIES, state="readonly", width=20)
+        self.quality_combo.grid(row=6, column=1, sticky="ew", padx=(12, 0), pady=(0, 8))
+        self.quality_combo.bind("<<ComboboxSelected>>", self._save_preferences)
+        self.video_quality_combo = ttk.Combobox(form, textvariable=self.video_quality_var, state="readonly", width=20)
+        self.video_quality_combo.grid(row=6, column=1, sticky="ew", padx=(12, 0), pady=(0, 8))
+        self.video_quality_combo.bind("<<ComboboxSelected>>", self._change_video_quality)
 
-        self.cookies_file_label = ttk.Label(form, background=COLORS["panel"])
-        self.cookies_file_label.grid(row=3, column=0, sticky="w", pady=6)
-        self.localized_widgets.append((self.cookies_file_label, "cookies_file"))
-        ttk.Entry(form, textvariable=self.cookies_file_var).grid(row=3, column=1, sticky="ew", padx=(12, 8), pady=6)
-        cookie_buttons = ttk.Frame(form, style="Panel.TFrame")
-        cookie_buttons.grid(row=3, column=2, sticky="e", pady=6)
-        self.choose_cookies_button = ttk.Button(cookie_buttons, command=self._choose_cookies_file)
-        self.choose_cookies_button.pack(side=tk.LEFT, padx=(0, 6))
+        self.cookies_file_label = self._localized(form, "cookies_file")
+        self.cookies_file_label.grid(row=7, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        cookie_row = ttk.Frame(form, style="Panel.TFrame")
+        cookie_row.grid(row=8, column=0, columnspan=2, sticky="ew")
+        cookie_row.columnconfigure(0, weight=1)
+        self.cookies_entry = ttk.Entry(cookie_row, textvariable=self.cookies_file_var)
+        self.cookies_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.cookies_entry.bind("<FocusOut>", self._save_preferences)
+        self.choose_cookies_button = ttk.Button(cookie_row, command=self._choose_cookies_file, style="Blue.TButton")
+        self.choose_cookies_button.grid(row=0, column=1, padx=(0, 6))
         self.localized_widgets.append((self.choose_cookies_button, "choose_cookies"))
-        self.clear_cookies_button = ttk.Button(cookie_buttons, command=self._clear_cookies_file)
-        self.clear_cookies_button.pack(side=tk.LEFT)
+        self.clear_cookies_button = ttk.Button(cookie_row, command=self._clear_cookies_file)
+        self.clear_cookies_button.grid(row=0, column=2)
         self.localized_widgets.append((self.clear_cookies_button, "clear_cookies"))
-
-        self.cookies_help_button = ttk.Button(form, command=self._show_cookies_help)
-        self.cookies_help_button.grid(row=4, column=1, sticky="w", padx=(12, 0), pady=(2, 6))
+        self.cookies_help_button = ttk.Button(form, command=self._show_cookies_help, style="Link.TButton")
+        self.cookies_help_button.grid(row=9, column=0, columnspan=2, sticky="w", pady=(3, 0))
         self.localized_widgets.append((self.cookies_help_button, "cookies_help"))
 
         buttons = ttk.Frame(root)
-        buttons.grid(row=2, column=0, sticky="ew", pady=14)
+        self.buttons_frame = buttons
+        buttons.grid(row=1, column=0, sticky="ew", pady=8)
         buttons.columnconfigure(0, weight=1)
-        self.run_button = ttk.Button(buttons, command=self._run, style="Accent.TButton")
-        self.run_button.grid(row=0, column=1, padx=(8, 0))
-        self.localized_widgets.append((self.run_button, "download"))
+        self.status_label = ttk.Label(buttons, textvariable=self.status_var, style="Badge.TLabel")
+        self.status_label.grid(row=0, column=0, sticky="w")
+        self.update_button = ttk.Button(buttons, command=self._update_engine, style="Blue.TButton")
+        self.update_button.grid(row=0, column=1, padx=(0, 8))
+        self.localized_widgets.append((self.update_button, "update"))
         self.stop_button = ttk.Button(buttons, command=self._stop_download, state=tk.DISABLED)
-        self.stop_button.grid(row=0, column=2, padx=(8, 0))
+        self.stop_button.grid(row=0, column=2, padx=(0, 8))
         self.localized_widgets.append((self.stop_button, "stop"))
-        self.clear_button = ttk.Button(buttons, command=self._clear_log)
-        self.clear_button.grid(row=0, column=3, padx=(8, 0))
-        self.localized_widgets.append((self.clear_button, "clear_log"))
+        self.run_button = ttk.Button(buttons, command=self._run, style="Accent.TButton")
+        self.run_button.grid(row=0, column=3)
+        self.localized_widgets.append((self.run_button, "download"))
 
-        log_frame = ttk.Frame(root)
-        log_frame.grid(row=3, column=0, sticky="nsew")
+        self.activity_card = RoundedCard(root, padding=12)
+        self.activity_card.grid(row=2, column=0, sticky="nsew")
+        log_frame = self.activity_card.content
         log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(1, weight=1)
-        ttk.Label(log_frame, textvariable=self.status_var, style="Muted.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 8))
-        self.progress = ttk.Progressbar(log_frame, mode="indeterminate")
-        self.progress.grid(row=0, column=1, sticky="ew", pady=(0, 8))
-        self.log = tk.Text(
-            log_frame,
-            height=20,
-            wrap="word",
-            undo=True,
-            bg="#0b0f12",
-            fg=COLORS["text"],
-            insertbackground=COLORS["text"],
-            relief="solid",
-            borderwidth=1,
-            highlightthickness=1,
-            highlightbackground=COLORS["border"],
-            font=("Consolas", 10),
-        )
-        self.log.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        log_frame.rowconfigure(3, weight=1)
+        self._localized(log_frame, "activity", "Activity.TLabel").grid(row=0, column=0, sticky="w")
+        self.clear_button = ttk.Button(log_frame, command=self._clear_log, style="Link.TButton")
+        self.clear_button.grid(row=0, column=1, sticky="e")
+        self.localized_widgets.append((self.clear_button, "clear_log"))
+        ttk.Label(log_frame, textvariable=self.detail_var, style="PanelMuted.TLabel").grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 7))
+        self.progress = ttk.Progressbar(log_frame, mode="determinate", maximum=100)
+        self.progress.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        self.log = tk.Text(log_frame, height=6, wrap="word", undo=False, state=tk.DISABLED, bg=COLORS["panel"],
+                           fg=COLORS["muted"], relief="flat", borderwidth=0, highlightthickness=0,
+                           padx=0, pady=0, font=("Segoe UI", 9))
+        self.log.tag_configure("error", foreground=COLORS["error"])
+        self.log.tag_configure("success", foreground=COLORS["blue"])
+        self.log.grid(row=3, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(log_frame, command=self.log.yview)
-        scrollbar.grid(row=1, column=2, sticky="ns")
+        scrollbar.grid(row=3, column=1, sticky="ns")
         self.log.configure(yscrollcommand=scrollbar.set)
+        self.footer_label = self._localized(root, "preferences_saved", "Muted.TLabel")
+        self.footer_label.grid(row=3, column=0, sticky="w", pady=(6, 0))
+
+    def _resize_window(self, event):
+        if event.widget is not self:
+            return
+        compact = event.height < 680
+        if compact == self._compact:
+            return
+        self._compact = compact
+        self.urls_text.configure(height=2 if compact else 3)
+        self.form_card.set_padding(14 if compact else 16)
 
     def _bind_edit_shortcuts(self):
         for sequence, handler in {
@@ -413,25 +600,101 @@ class MP3ShipApp(tk.Tk):
         path = filedialog.askdirectory(title=self.t("choose_output"))
         if path:
             self.output_var.set(path)
+            self._save_preferences()
 
     def _choose_cookies_file(self):
-        downloads = Path.home() / "Downloads"
-        initial_dir = downloads if downloads.exists() else Path.home()
         path = filedialog.askopenfilename(
             title=self.t("choose_cookies_file"),
-            initialdir=str(initial_dir),
             filetypes=[("cookies.txt", "*.txt"), ("All files", "*.*")],
         )
         if path:
             self.cookies_file_var.set(path)
+            self._save_preferences()
 
     def _clear_cookies_file(self):
         self.cookies_file_var.set("")
+        self._save_preferences()
 
     def _show_cookies_help(self):
-        messagebox.showinfo(self.t("cookies_help_title"), self.t("cookies_help_text"))
+        messagebox.showinfo(self.t("cookies_help_title"), self.t("cookies_help_text"), parent=self)
         webbrowser.open("https://www.youtube.com/")
         webbrowser.open("https://chromewebstore.google.com/search/cookies.txt")
+
+    def _change_mode(self, _event=None):
+        self.mode = "audio" if self.mode_combo.current() == 0 else "video"
+        self._sync_format_controls()
+        self._save_preferences()
+
+    def _change_video_quality(self, _event=None):
+        self.height_var.set(VIDEO_HEIGHTS[self.video_quality_combo.current()])
+        self._save_preferences()
+
+    def _sync_format_controls(self):
+        self.mode_combo.configure(values=(self.t("audio_mode"), self.t("video_mode")))
+        self.mode_combo.current(0 if self.mode == "audio" else 1)
+        self.video_quality_combo.configure(values=(self.t("best_quality"), *(height + "p" for height in VIDEO_HEIGHTS[1:])))
+        self.video_quality_combo.current(VIDEO_HEIGHTS.index(self.height_var.get()))
+        self.quality_label.configure(text=self.t("quality" if self.mode == "audio" else "video_quality"))
+        if self.mode == "audio":
+            self.video_quality_combo.grid_remove()
+            self.quality_combo.grid()
+        else:
+            self.quality_combo.grid_remove()
+            self.video_quality_combo.grid()
+
+    def _set_busy(self, status):
+        self.run_button.configure(state=tk.DISABLED)
+        self.update_button.configure(state=tk.DISABLED)
+        self.mode_combo.configure(state=tk.DISABLED)
+        self.quality_combo.configure(state=tk.DISABLED)
+        self.video_quality_combo.configure(state=tk.DISABLED)
+        self.stop_button.configure(state=tk.NORMAL)
+        self.cancel_event.clear()
+        self.urls_text.configure(state=tk.DISABLED)
+        for widget in (self.output_entry, self.browse_button, self.cookies_entry, self.choose_cookies_button, self.clear_cookies_button):
+            widget.configure(state=tk.DISABLED)
+        with self._progress_lock:
+            self._latest_progress = None
+        self.progress.configure(mode="indeterminate", value=0)
+        self.progress.start(18)
+        self.detail_var.set(self.t(status))
+        self.status_var.set(self.t(status))
+
+    def _update_engine(self):
+        if self.worker and self.worker.is_alive():
+            return
+        self._set_busy("updating")
+        self.worker = threading.Thread(target=self._worker_update, daemon=True)
+        self.worker.start()
+
+    def _worker_update(self):
+        outcome = "updated"
+        try:
+            update_engine(force=True, cancel_event=self.cancel_event, report=self._report)
+        except DownloadCancelled:
+            outcome = "stopped"
+            self.log_queue.put(self.t("stopped") + "\n")
+        except Exception as error:
+            outcome = "failed"
+            self.log_queue.put(self.t("error") + " " + str(error) + "\n")
+        finally:
+            self.log_queue.put(("__DONE__", outcome))
+
+    def _report(self, key, **values):
+        if values.get("version") == "bundled":
+            values["version"] = self.t("built_in")
+        self.log_queue.put(self.t(key).format(**values) + "\n")
+
+    def _on_close(self):
+        if not self.closing:
+            self._save_preferences()
+        self.closing = True
+        if self.worker and self.worker.is_alive():
+            self.cancel_event.set()
+            self.status_var.set(self.t("stopping"))
+            self.after(100, self._on_close)
+        else:
+            self.destroy()
 
     def _extract_urls(self):
         text = self.urls_text.get("1.0", tk.END)
@@ -449,15 +712,15 @@ class MP3ShipApp(tk.Tk):
         if not output:
             messagebox.showerror(APP_NAME, self.t("missing_output"))
             return
-
-        self.run_button.configure(state=tk.DISABLED)
-        self.stop_button.configure(state=tk.NORMAL)
-        self.cancel_event.clear()
-        self.progress.start(12)
-        self.status_var.set(self.t("downloading"))
-        self._write_log("\n" + self.t("starting") + "\n")
         cookies_file = self.cookies_file_var.get().strip() or None
-        args = (urls, output, self.quality_var.get(), cookies_file)
+        if cookies_file and not Path(cookies_file).expanduser().is_file():
+            messagebox.showerror(APP_NAME, self.t("invalid_cookies"))
+            return
+
+        self._save_preferences()
+        self._set_busy("downloading")
+        self._write_log("\n" + self.t("starting") + "\n")
+        args = (urls, output, self.quality_var.get(), self.mode, self.height_var.get(), cookies_file)
         self.worker = threading.Thread(target=self._worker_run, args=args, daemon=True)
         self.worker.start()
 
@@ -468,68 +731,122 @@ class MP3ShipApp(tk.Tk):
             self._write_log("\n" + self.t("stopping") + "\n")
             self.stop_button.configure(state=tk.DISABLED)
 
-    def _worker_run(self, urls, output, quality, cookies_file):
+    def _worker_run(self, urls, output, quality, mode, height, cookies_file=None):
+        outcome = "done"
         try:
-            failures = download_mp3(
-                urls,
-                output,
-                quality,
+            download_media(
+                urls, output, quality, mode=mode, height=height,
+                cookies_file=cookies_file,
                 progress_hooks=[self._progress_hook],
                 logger=GuiLogger(self.log_queue),
-                cookies_file=cookies_file,
                 cancel_event=self.cancel_event,
+                report=self._report,
             )
-            if failures:
-                self.log_queue.put("\n" + self.t("finished_with_errors") + "\n")
-            else:
-                self.log_queue.put("\n" + self.t("done") + "\n")
+            self.log_queue.put("\n" + self.t("done") + "\n")
+        except DownloadCancelled:
+            outcome = "stopped"
+            self.log_queue.put("\n" + self.t("stopped") + "\n")
         except DownloadError as error:
+            outcome = "failed"
             message = str(error)
-            if self.cancel_event.is_set() or "cancelled by user" in message.lower():
-                self.log_queue.put("\n" + self.t("stopped") + "\n")
-            else:
-                self.log_queue.put("\n" + self.t("download_error") + message + "\n")
-                if self._is_bot_check_error(message):
-                    self.log_queue.put(self.t("bot_hint") + "\n")
+            self.log_queue.put("\n" + self.t("download_error") + message + "\n")
+            if self._is_bot_check_error(message):
+                self.log_queue.put(self.t("bot_hint") + "\n")
         except Exception:
+            outcome = "failed"
             self.log_queue.put("\n" + self.t("error") + "\n" + traceback.format_exc())
         finally:
-            self.log_queue.put(("__DONE__", None))
+            self.log_queue.put(("__DONE__", outcome))
 
     def _progress_hook(self, info):
-        status = info.get("status")
         if self.cancel_event.is_set():
-            raise DownloadError("Cancelled by user.")
-        if status == "downloading":
-            name = info.get("filename") or info.get("tmpfilename") or "audio"
-            percent = info.get("_percent_str", "").strip()
-            speed = info.get("_speed_str", "").strip()
-            self.log_queue.put(f"{self.t('downloading_file')} {Path(name).name} {percent} {speed}\n")
-        elif status == "finished":
-            name = info.get("filename") or "audio"
-            self.log_queue.put(f"{self.t('converting_file')} {Path(name).name} {self.t('to_mp3')}\n")
+            raise DownloadCancelled("Cancelled by user.")
+        # Replace the last progress sample; never queue a log line for every chunk.
+        with self._progress_lock:
+            self._latest_progress = dict(info)
+
+    def _apply_progress(self, info):
+        if info.get("status") == "downloading":
+            total = info.get("total_bytes") or info.get("total_bytes_estimate") or 0
+            downloaded = info.get("downloaded_bytes") or 0
+            if total:
+                self.progress.stop()
+                self.progress.configure(mode="determinate", value=min(100, downloaded * 100 / total))
+            percent = f"{downloaded * 100 / total:.1f}%" if total else "…"
+            speed = info.get("speed")
+            speed_text = f"{speed / 1024 / 1024:.1f} MB/s" if speed else ""
+            filename = Path(info.get("filename") or info.get("tmpfilename") or "").name
+            self.detail_var.set(f"{filename[:70]}   {percent}   {speed_text}".strip())
+        elif info.get("status") == "finished":
+            self.progress.configure(mode="determinate", value=100)
+            self.detail_var.set(self.t("processing_file"))
 
     def _drain_log_queue(self):
+        with self._progress_lock:
+            latest = self._latest_progress
+            self._latest_progress = None
+        if latest is not None:
+            self._apply_progress(latest)
+        deadline = time.monotonic() + 0.012
+        messages = []
         try:
-            while True:
+            for _ in range(200):
                 item = self.log_queue.get_nowait()
                 if isinstance(item, tuple) and item[0] == "__DONE__":
                     self.progress.stop()
                     self.run_button.configure(state=tk.NORMAL)
+                    self.update_button.configure(state=tk.NORMAL)
+                    self.mode_combo.configure(state="readonly")
+                    self.quality_combo.configure(state="readonly")
+                    self.video_quality_combo.configure(state="readonly")
+                    self.urls_text.configure(state=tk.NORMAL)
+                    for widget in (self.output_entry, self.browse_button, self.cookies_entry, self.choose_cookies_button, self.clear_cookies_button):
+                        widget.configure(state=tk.NORMAL)
                     self.stop_button.configure(state=tk.DISABLED)
-                    self.status_var.set(self.t("ready"))
+                    self.status_var.set(self.t(item[1]))
+                    self.status_label.configure(foreground=COLORS["error"] if item[1] == "failed" else COLORS["blue"])
+                    self.detail_var.set(self.t("complete_detail") if item[1] == "done" else self.t(item[1]))
+                    self.progress.configure(mode="determinate", value=100 if item[1] == "done" else 0)
+                    if item[1] == "done":
+                        self.urls_text.delete("1.0", tk.END)
                 else:
-                    self._write_log(item)
+                    messages.append(item)
+                if time.monotonic() >= deadline:
+                    break
         except queue.Empty:
             pass
-        self.after(100, self._drain_log_queue)
+        if messages:
+            self._write_log("".join(messages))
+        if not self.closing:
+            self.after(100, self._drain_log_queue)
 
     def _write_log(self, text):
+        at_bottom = self.log.yview()[1] >= 0.98
+        self.log.configure(state=tk.NORMAL)
         self.log.insert(tk.END, text)
-        self.log.see(tk.END)
+        lines = int(self.log.index("end-1c").split(".")[0])
+        if lines > MAX_LOG_LINES:
+            self.log.delete("1.0", f"{lines - MAX_LOG_LINES + 1}.0")
+        self.log.configure(state=tk.DISABLED)
+        if at_bottom:
+            self.log.see(tk.END)
 
     def _clear_log(self):
+        self.log.configure(state=tk.NORMAL)
         self.log.delete("1.0", tk.END)
+        self.log.configure(state=tk.DISABLED)
+
+    def _save_preferences(self, _event=None):
+        try:
+            save_settings({
+                "output": self.output_var.get(), "quality": self.quality_var.get(),
+                "height": self.height_var.get(), "mode": self.mode,
+                "language": self.language, "cookies": self.cookies_file_var.get(),
+            }, self.settings_path)
+        except OSError as error:
+            if not self._settings_warning_shown:
+                self._settings_warning_shown = True
+                self.log_queue.put(self.t("settings_error") + str(error) + "\n")
 
     def _is_bot_check_error(self, message):
         lowered = message.lower()
@@ -538,19 +855,67 @@ class MP3ShipApp(tk.Tk):
     def _toggle_language(self):
         self.language = "en" if self.language == "ru" else "ru"
         self._apply_language(clear_log=False)
+        self._save_preferences()
 
     def _apply_language(self, clear_log=False):
         self.title(APP_NAME)
         for widget, key in self.localized_widgets:
             widget.configure(text=self.t(key))
-        self.status_var.set(self.t("ready"))
+        self._sync_format_controls()
+        if not self.worker or not self.worker.is_alive():
+            self.status_var.set(self.t("ready"))
+            self.detail_var.set(self.t("idle_detail"))
         if clear_log:
-            self.log.delete("1.0", tk.END)
+            self._clear_log()
             self._write_log(self.t("ready_log") + "\n")
+
+
+def run_self_test(report_path):
+    """Verify the packaged UI and binary dependencies without opening a window."""
+    from youtube_to_mp3 import bundled_deno_path, bundled_engine_path, bundled_ffmpeg_dir
+
+    results = {}
+    app = None
+    try:
+        app = MP3ShipApp(settings_path=Path(report_path).with_suffix(".settings.json"))
+        app.withdraw()
+        app.mode_combo.current(1)
+        app._change_mode()
+        app._toggle_language()
+        if app.mode != "video" or app.height_var.get() != "1080":
+            raise RuntimeError("Format selection is not working.")
+        results["ui"] = "ok"
+        ffmpeg_dir = bundled_ffmpeg_dir()
+        binaries = {
+            "yt-dlp": bundled_engine_path(), "deno": bundled_deno_path(),
+            "ffmpeg": ffmpeg_dir / "ffmpeg.exe" if ffmpeg_dir else None,
+            "ffprobe": ffmpeg_dir / "ffprobe.exe" if ffmpeg_dir else None,
+        }
+        for name, path in binaries.items():
+            if path is None or not path.is_file():
+                raise RuntimeError(f"Missing bundled {name}.")
+            flag = "-version" if name in ("ffmpeg", "ffprobe") else "--version"
+            result = subprocess.run([str(path), flag], capture_output=True, encoding="utf-8",
+                                    errors="replace", timeout=30, check=True,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+            results[name] = result.stdout.splitlines()[0]
+        results["ok"] = True
+    except Exception:
+        results["ok"] = False
+        results["error"] = traceback.format_exc()
+    finally:
+        if app is not None:
+            for callback in app.tk.call("after", "info"):
+                app.after_cancel(callback)
+            app.destroy()
+        Path(report_path).write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    return 0 if results["ok"] else 1
 
 
 if __name__ == "__main__":
     enable_high_dpi()
-    configure_bundled_ffmpeg()
-    app = MP3ShipApp()
-    app.mainloop()
+    if len(sys.argv) == 3 and sys.argv[1] == "--self-test":
+        raise SystemExit(run_self_test(sys.argv[2]))
+    else:
+        app = MP3ShipApp()
+        app.mainloop()

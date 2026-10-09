@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 build/
 *.spec.bak
+vendor/yt-dlp/
+vendor/runtime-tools.zip
