@@ -18,6 +18,7 @@ from youtube_to_mp3 import (
 
 
 from app_settings import load_settings, save_settings
+from windows_icon import WindowsWindowIcon
 
 
 APP_NAME = "OneCorsair"
@@ -164,7 +165,14 @@ def enable_high_dpi():
         import ctypes
 
         try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+            # Let Windows report each monitor's actual scale to the native icon
+            # loader instead of stretching a system-DPI bitmap on another screen.
+            if ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
+                return
+        except (AttributeError, OSError):
+            pass
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
         except Exception:
             ctypes.windll.user32.SetProcessDPIAware()
     except Exception:
@@ -262,8 +270,11 @@ class MP3ShipApp(tk.Tk):
         self.configure(bg=COLORS["bg"])
 
         icon = resource_path("assets/download_icon.ico")
+        self._native_icon = None
         if icon.exists():
             self.iconbitmap(default=str(icon))
+            if sys.platform == "win32":
+                self._native_icon = WindowsWindowIcon(icon)
         self._window_icon_sizes = []
         for size in (256, 128, 96, 64, 48, 40, 32, 28, 24, 20, 16):
             frame = resource_path(f"assets/window-icons/icon-{size}.png")
@@ -299,12 +310,31 @@ class MP3ShipApp(tk.Tk):
         self._build_ui()
         self._compact = None
         self.bind("<Configure>", self._resize_window, add="+")
+        self.bind("<Configure>", self._refresh_native_icon, add="+")
+        self.bind("<Map>", self._refresh_native_icon, add="+")
         self._apply_language(clear_log=True)
         self.update_idletasks()
+        self._refresh_native_icon()
         self.geometry(f"+{left + (right - left - width) // 2}+{top + (bottom - top - height) // 2}")
         self.deiconify()
         self.after(100, self._drain_log_queue)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _refresh_native_icon(self, event=None):
+        if self._native_icon is None or (event is not None and event.widget is not self):
+            return
+        try:
+            self._native_icon.apply(int(self.wm_frame(), 16), force=event is not None and event.type == tk.EventType.Map)
+        except (OSError, tk.TclError):
+            # Keep Tk's bundled icon as a fallback if a native API is unavailable.
+            pass
+
+    def destroy(self):
+        try:
+            super().destroy()
+        finally:
+            if getattr(self, "_native_icon", None) is not None:
+                self._native_icon.close()
 
     def t(self, key):
         return I18N[self.language][key]
@@ -885,6 +915,15 @@ def run_self_test(report_path):
         if app.mode != "video" or app.height_var.get() != "1080":
             raise RuntimeError("Format selection is not working.")
         results["ui"] = "ok"
+        if sys.platform == "win32":
+            native = app._native_icon
+            hwnd = int(app.wm_frame(), 16)
+            if native is None or not native._icons:
+                raise RuntimeError("Native taskbar icons are missing.")
+            if any(native.user.SendMessageW(hwnd, 0x7F, slot, 0) != handle
+                   for slot, handle in enumerate(native._icons)):
+                raise RuntimeError("Windows did not retain the native taskbar icons.")
+            results["taskbar_icon"] = "native"
         ffmpeg_dir = bundled_ffmpeg_dir()
         binaries = {
             "yt-dlp": bundled_engine_path(), "deno": bundled_deno_path(),

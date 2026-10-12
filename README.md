@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <strong>Версия 1.0.0 · Windows x64 · MP3 / MP4</strong><br>
+  <strong>Версия 1.0.1 · Windows x64 · MP3 / MP4</strong><br>
   <a href="https://github.com/dumuzeyn/OneCorsair/releases">Все версии</a> ·
   <a href="#english-version">English</a>
 </p>
@@ -25,6 +25,8 @@
 Автономное Windows-приложение для скачивания аудио YouTube в **MP3** и видео со звуком в **MP4**. В EXE включены yt-dlp, FFmpeg, FFprobe и Deno; отдельно устанавливать Python или другие программы не нужно.
 
 В актуальной версии доступны два формата, автоматическое обновление загрузчика, необязательный файл cookies, сохранение настроек и остановка загрузки. Компактное окно открывается по центру экрана. Новый морской логотип имеет 11 сглаженных размеров для значка окна и масштаба Windows.
+
+В **1.0.1** исправлено назначение значка на панели задач: приложение передаёт Windows отдельные значки достаточного разрешения и обновляет их при изменении масштаба монитора.
 
 ![Светлый интерфейс приложения](assets/screenshots/new-design.png)
 
@@ -159,7 +161,7 @@ python -m unittest discover -s tests -p test_media_integration.py -v
 
 OneCorsair is a self-contained Windows application for downloading YouTube audio as **MP3** or video with sound as **MP4**. The EXE bundles yt-dlp, FFmpeg, FFprobe and Deno.
 
-Version 1.0.0 includes automatic engine updates, optional cookies, saved preferences, cancellation, a compact centered window and a nautical logo with 11 smooth icon sizes. The download button opens the latest Windows executable directly.
+Version 1.0.1 includes automatic engine updates, optional cookies, saved preferences, cancellation, a compact centered window and a nautical logo with 11 smooth icon sizes. This patch explicitly assigns native taskbar icons at sufficient resolution and refreshes them when the monitor scale changes. The download button opens the latest Windows executable directly.
 
 The compact light interface has no large header and uses white panels, blue headings, pink accents and a red Download button. The minimal nautical icon combines a white sail and a pink wave on a blue background. The resizable 800×640 window opens in the center of the desktop work area. Folder, format, quality, language and cookies file path are remembered. Progress samples are coalesced and the activity log is capped at 800 lines. Large tools are installed once into the app cache, instead of unpacking those executables on every startup. Cookies help shows export instructions, then opens YouTube and the cookies.txt search in the Chrome Web Store.
 
