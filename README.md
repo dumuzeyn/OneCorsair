@@ -7,20 +7,21 @@
 <p align="center">Видео и аудио с YouTube — в одном приложении для Windows.</p>
 
 <p align="center">
-  <a href="https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe">
+  <a href="https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsairSetup.exe">
     <img src="assets/download-windows.svg" alt="Скачать OneCorsair для Windows" width="292" height="56">
   </a>
 </p>
 
 <p align="center">
-  <strong>Версия 1.0.1 · Windows x64 · MP3 / MP4</strong><br>
+  <strong>Версия 1.0.2 · Windows x64 · MP3 / MP4</strong><br>
+  <a href="https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe">Portable EXE</a> ·
   <a href="https://github.com/dumuzeyn/OneCorsair/releases">Все версии</a> ·
   <a href="#english-version">English</a>
 </p>
 
 ## Русская версия
 
-[English version](#english-version) · [Скачать OneCorsair.exe](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe)
+[English version](#english-version) · [Скачать установщик](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsairSetup.exe) · [Portable EXE](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe)
 
 Автономное Windows-приложение для скачивания аудио YouTube в **MP3** и видео со звуком в **MP4**. В EXE включены yt-dlp, FFmpeg, FFprobe и Deno; отдельно устанавливать Python или другие программы не нужно.
 
@@ -28,11 +29,13 @@
 
 В **1.0.1** исправлено назначение значка на панели задач: приложение передаёт Windows отдельные значки достаточного разрешения и обновляет их при изменении масштаба монитора.
 
+В **1.0.2** добавлена установка для Windows: приложение появляется в «Установленных приложениях», поиске и списке программ «Пуска». Ярлык использует постоянную иконку и идентификатор `OneCorsair.Downloader`, совпадающий с окном приложения.
+
 ![Светлый интерфейс приложения](assets/screenshots/new-design.png)
 
 ### Как скачать
 
-1. Скачайте **OneCorsair.exe** кнопкой выше и запустите файл.
+1. Скачайте **OneCorsairSetup.exe** кнопкой выше и установите приложение. Запустите **OneCorsair** из «Пуска». Права администратора не нужны.
 2. Вставьте одну или несколько ссылок YouTube. Поддерживаются плейлисты и ссылки, разделённые пробелами или переносами строк.
 3. Выберите папку сохранения.
 4. Выберите **Аудио · MP3** или **Видео со звуком · MP4**.
@@ -40,6 +43,14 @@
 6. При необходимости выберите экспортированный **cookies.txt**. Поле можно оставить пустым. Кнопка **Помощь с cookies** показывает пошаговую инструкцию, затем открывает YouTube и поиск расширений cookies.txt в Chrome Web Store.
 7. Нажмите **Скачать**. Журнал показывает обновление загрузчика, скачивание, обработку и пути готовых файлов.
 8. Кнопка **Остановить** прерывает загрузку и запущенные ею процессы FFmpeg/Deno. При закрытии окна приложение также завершает текущую задачу.
+
+### Установка и интеграция с Windows
+
+Установщик размещает программу и иконку в `%LOCALAPPDATA%/Programs/OneCorsair`, создаёт ярлык **OneCorsair** в «Пуске» и регистрирует удаление в **Параметры → Приложения → Установленные приложения**. Приложение устанавливается только для текущего пользователя. Иконка больше не зависит от папки проекта, временных файлов или расположения скачанного установщика.
+
+После установки найдите **OneCorsair** в «Пуске» и при необходимости закрепите его. Если старая закреплённая плитка всё ещё показывает пустой значок, открепите её и закрепите установленный OneCorsair заново. Удаление приложения не удаляет скачанные видео, аудио и сохранённые настройки.
+
+Для запуска без установки доступен **Portable EXE**. Сам по себе переносной файл не добавляет программу в «Установленные приложения».
 
 Для обычного скачивания cookies не обязательны. Если YouTube требует вход или подтверждение, можно выбрать cookies.txt в формате Netscape, экспортированный из браузера с входом в YouTube. Кнопка **Очистить** отключает использование файла. Приложение игнорирует внешние конфигурации и плагины yt-dlp; в интерфейсе читается только выбранный файл. В командной строке также доступен явный параметр `--cookies-from-browser`.
 
@@ -129,6 +140,14 @@ python -m PyInstaller --clean --noconfirm OneCorsair.spec
 
 `prepare_vendor.py` скачивает и проверяет официальный yt-dlp nightly для включения в EXE. `prepare_runtime.py` собирает архив FFmpeg/FFprobe/Deno; пути этих инструментов можно изменить в этом скрипте. Готовое приложение: `dist/OneCorsair.exe`. Чтобы заново экспортировать SVG/PNG/ICO иконки, выполните `python create_icon.py`.
 
+Установщик собирается [Inno Setup 7](https://jrsoftware.org/isinfo.php). После сборки EXE выполните команду компилятором `ISCC.exe`:
+
+```powershell
+ISCC.exe OneCorsair.iss
+```
+
+Результат: `dist/OneCorsairSetup.exe`. Установщик опубликован в релизах; исходник установки — `OneCorsair.iss`.
+
 ### Командная строка
 
 ```powershell
@@ -157,11 +176,13 @@ python -m unittest discover -s tests -p test_media_integration.py -v
 
 ## English version
 
-[Русская версия](#русская-версия) · [Download OneCorsair.exe](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe)
+[Русская версия](#русская-версия) · [Windows installer](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsairSetup.exe) · [Portable EXE](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe)
 
 OneCorsair is a self-contained Windows application for downloading YouTube audio as **MP3** or video with sound as **MP4**. The EXE bundles yt-dlp, FFmpeg, FFprobe and Deno.
 
-Version 1.0.1 includes automatic engine updates, optional cookies, saved preferences, cancellation, a compact centered window and a nautical logo with 11 smooth icon sizes. This patch explicitly assigns native taskbar icons at sufficient resolution and refreshes them when the monitor scale changes. The download button opens the latest Windows executable directly.
+Version 1.0.2 adds a per-user Windows installer. The app appears in Installed apps and the Start menu, with an uninstaller, a stable icon path and a shortcut AppUserModelID matching its window. Installation uses `%LOCALAPPDATA%/Programs/OneCorsair` and does not require administrator privileges. The main download button downloads **OneCorsairSetup.exe**; **OneCorsair.exe** remains available for portable use. Old pinned entries may need to be unpinned and the installed app pinned again.
+
+The app includes automatic engine updates, optional cookies, saved preferences, cancellation, a compact centered window and a nautical logo with 11 smooth icon sizes. Native taskbar icons use sufficient resolution and follow monitor scale changes.
 
 The compact light interface has no large header and uses white panels, blue headings, pink accents and a red Download button. The minimal nautical icon combines a white sail and a pink wave on a blue background. The resizable 800×640 window opens in the center of the desktop work area. Folder, format, quality, language and cookies file path are remembered. Progress samples are coalesced and the activity log is capped at 800 lines. Large tools are installed once into the app cache, instead of unpacking those executables on every startup. Cookies help shows export instructions, then opens YouTube and the cookies.txt search in the Chrome Web Store.
 
