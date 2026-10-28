@@ -25,6 +25,10 @@ class MediaLinkTests(unittest.TestCase):
                     'https://tiktok.com@elsewhere.example/video/123'):
             self.assertIsNone(detect_source(url))
 
+    def test_likee_profile_tracking_does_not_become_part_of_the_username(self):
+        self.assertEqual(normalize_media_url('https://likee.video/@creator?utm_source=share#profile'),
+                         'https://likee.video/@creator')
+
     def test_query_parameters_and_local_media_links_are_preserved(self):
         urls = ['https://www.instagram.com/p/abc/?igsh=abc&source=share', 'http://127.0.0.1:8181/test.mp4']
         self.assertEqual(extract_media_links('\n'.join(urls)), urls)

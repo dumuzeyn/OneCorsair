@@ -42,6 +42,10 @@ def normalize_media_url(url):
     # so the engine can resolve their redirects using the same cookie settings.
     if parsed.hostname in ("tiktok.com", "m.tiktok.com"):
         url = urlunsplit((parsed.scheme, "www.tiktok.com", parsed.path, parsed.query, parsed.fragment))
+    elif detect_source(url) == "Likee" and re.fullmatch(r"/@[^/]+/?", parsed.path):
+        # Likee's profile matcher treats a trailing query as part of the username.
+        # Profile identity is the path; share/marketing parameters are not needed.
+        url = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
     return url
 
 
