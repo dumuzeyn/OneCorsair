@@ -1,6 +1,8 @@
 """Create the SVG source and export a crisp, multi-resolution Windows icon."""
 
 from pathlib import Path
+import io
+import struct
 
 from PIL import Image, ImageDraw
 
@@ -14,6 +16,34 @@ SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBo
   <path d="M147 46 C115 80 92 113 76 153 C100 143 124 142 147 146 Z" fill="#ffffff"/>
   <path d="M62 184 C86 168 109 168 132 184 C155 200 177 200 198 184" fill="none" stroke="#f06585" stroke-width="16" stroke-linecap="round"/>
 </svg>'''
+
+
+def save_windows_ico(path, frames):
+    """Use native 32-bit DIB frames below 256px, plus a large PNG frame."""
+    chunks = []
+    for size, frame in sorted(frames.items()):
+        if size == 256:
+            buffer = io.BytesIO()
+            frame.save(buffer, format="PNG")
+            chunks.append((size, buffer.getvalue()))
+            continue
+        rgba = frame.convert("RGBA")
+        pixels = rgba.transpose(Image.Transpose.FLIP_TOP_BOTTOM).tobytes("raw", "BGRA")
+        mask_stride = ((size + 31) // 32) * 4
+        mask = bytearray(mask_stride * size)
+        alpha = rgba.getchannel("A")
+        for y in range(size):
+            for x in range(size):
+                if alpha.getpixel((x, y)) == 0:
+                    mask[(size - 1 - y) * mask_stride + x // 8] |= 0x80 >> (x % 8)
+        header = struct.pack("<IiiHHIIiiII", 40, size, size * 2, 1, 32, 0, len(pixels), 0, 0, 0, 0)
+        chunks.append((size, header + pixels + mask))
+    directory = bytearray(struct.pack("<HHH", 0, 1, len(chunks)))
+    offset = 6 + len(chunks) * 16
+    for size, data in chunks:
+        directory.extend(struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(data), offset))
+        offset += len(data)
+    path.write_bytes(directory + b"".join(data for _size, data in chunks))
 
 
 def main():
@@ -55,8 +85,11 @@ def main():
     for size, frame in frames.items():
         frame.save(icon_directory / f"icon-{size}.png")
     frames[256].save(assets / "download_icon.png")
-    frames[256].save(assets / "download_icon.ico", sizes=[(size, size) for size in ICON_SIZES],
-                     append_images=[frame for size, frame in frames.items() if size != 256])
+    save_windows_ico(assets / "download_icon.ico", frames)
+    wizard_icon = image.resize((55, 55), Image.Resampling.LANCZOS)
+    wizard_image = Image.new("RGB", (55, 55), "white")
+    wizard_image.paste(wizard_icon, (0, 0), wizard_icon)
+    wizard_image.save(assets / "setup-small.bmp")
     print("Created SVG, PNG and ICO, plus 11 smooth window icon sizes")
 
 

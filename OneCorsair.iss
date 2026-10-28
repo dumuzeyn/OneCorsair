@@ -1,14 +1,14 @@
 ; Per-user Windows installation; build with Inno Setup 7 ISCC.exe.
 #define AppName "OneCorsair"
-#define AppVersion "1.1.1"
+#define AppVersion "1.1.2"
 #define AppUserModelID "OneCorsair.Downloader"
 
 [Setup]
 AppId=OneCorsair
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=OneCorsair
-AppPublisherURL=https://github.com/dumuzeyn/OneCorsair
+AppPublisher=Dumuzeyn
+AppPublisherURL=https://github.com/dumuzeyn
 AppSupportURL=https://github.com/dumuzeyn/OneCorsair/issues
 AppUpdatesURL=https://github.com/dumuzeyn/OneCorsair/releases
 DefaultDirName={localappdata}\Programs\OneCorsair
@@ -21,6 +21,7 @@ MinVersion=10.0
 OutputDir=dist
 OutputBaseFilename=OneCorsairSetup
 SetupIconFile=assets\download_icon.ico
+WizardSmallImageFile=assets\setup-small.bmp
 UninstallDisplayIcon={app}\OneCorsair.ico
 UninstallDisplayName={#AppName}
 WizardStyle=modern
@@ -29,6 +30,7 @@ ChangesAssociations=yes
 RestartApplications=no
 VersionInfoVersion={#AppVersion}.0
 VersionInfoProductName={#AppName}
+VersionInfoCompany=Dumuzeyn
 VersionInfoDescription=OneCorsair Setup
 
 [Languages]

@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <strong>Версия 1.1.1 · Windows x64 · MP3 / MP4</strong><br>
+  <strong>Версия 1.1.2 · Dumuzeyn · Windows x64 · MP3 / MP4</strong><br>
   <a href="https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe">Portable EXE</a> ·
   <a href="https://github.com/dumuzeyn/OneCorsair/releases">Все версии</a> ·
   <a href="#english-version">English</a>
@@ -32,6 +32,8 @@
 В **1.0.2** добавлена установка для Windows: приложение появляется в «Установленных приложениях», поиске и списке программ «Пуска». Ярлык использует постоянную иконку и идентификатор `OneCorsair.Downloader`, совпадающий с окном приложения.
 
 В **1.1.0** поле называется **«Ссылка»**: сайт определяется автоматически, поддерживаются ссылки из текста «Поделиться» и ссылки без `https://`. Нижняя подпись о сохранении настроек убрана; сами настройки продолжают запоминаться. Подсказка cookies открывает сайт вставленного ролика. Обновлён встроенный yt-dlp и исправлен выбор форматов без сведений о разрешении.
+
+В **1.1.2** издатель в списке установленных приложений Windows и свойствах EXE указан как **Dumuzeyn**. Обновлён значок установщика для совместимости с Проводником Windows; логотип OneCorsair также добавлен в окно установки.
 
 ![Светлый интерфейс приложения](assets/screenshots/new-design.png)
 
@@ -192,7 +194,7 @@ python -m unittest discover -s tests -p test_media_integration.py -v
 
 OneCorsair is a self-contained Windows application for downloading **YouTube, TikTok and Instagram** videos with sound as **MP4**, or extracting audio as **MP3**. The EXE bundles yt-dlp, FFmpeg, FFprobe and Deno.
 
-Version 1.1.1 detects the site automatically from the **Link** field, accepts mixed share text and links without a scheme, and removes the bottom preferences caption. Settings are still remembered. Cookies help follows the linked site. Formats with missing height metadata can be downloaded without a format-selection error. The app includes a per-user Windows installer and appears in Installed apps and the Start menu, with an uninstaller, a stable icon path and a shortcut AppUserModelID matching its window. Installation uses `%LOCALAPPDATA%/Programs/OneCorsair` and does not require administrator privileges. The main download button downloads **OneCorsairSetup.exe**; **OneCorsair.exe** remains available for portable use. Old pinned entries may need to be unpinned and the installed app pinned again.
+Version 1.1.2 lists **Dumuzeyn** as the publisher in Windows Installed apps and in executable properties. The installer icon was updated for Windows Explorer compatibility, and the setup wizard now includes the OneCorsair logo. The app detects the site automatically from the **Link** field, accepts mixed share text and links without a scheme, and removes the bottom preferences caption. Settings are still remembered. Cookies help follows the linked site. Formats with missing height metadata can be downloaded without a format-selection error. The app includes a per-user Windows installer and appears in Installed apps and the Start menu, with an uninstaller, a stable icon path and a shortcut AppUserModelID matching its window. Installation uses `%LOCALAPPDATA%/Programs/OneCorsair` and does not require administrator privileges. The main download button downloads **OneCorsairSetup.exe**; **OneCorsair.exe** remains available for portable use. Old pinned entries may need to be unpinned and the installed app pinned again.
 
 The app includes automatic engine updates, optional cookies, saved preferences, cancellation, a compact centered window and a nautical logo with 11 smooth icon sizes. Native taskbar icons use sufficient resolution and follow monitor scale changes.
 
@@ -210,4 +212,4 @@ To build, install `requirements.txt`, provide FFmpeg/FFprobe and Deno at the pat
 
 ## Author
 
-Zeynalov U.R.o.
+[Dumuzeyn](https://github.com/dumuzeyn) — Zeynalov U.R.o.
