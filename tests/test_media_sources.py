@@ -54,4 +54,3 @@ class MediaLinkTests(unittest.TestCase):
                 for callback in app.tk.call('after', 'info'):
                     app.after_cancel(callback)
                 app.destroy()
-
