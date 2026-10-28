@@ -7,10 +7,10 @@ class MediaLinkTests(unittest.TestCase):
     def test_mixed_share_text_and_links_without_scheme(self):
         links = extract_media_links(
             'Видео: https://youtu.be/abc. TikTok: vt.tiktok.com/ZSabc/ '
-            'Instagram: (www.instagram.com/reel/abc/?igsh=test). Likee: https://likee.video/v/abc')
+            'Instagram: (www.instagram.com/reel/abc/?igsh=test).')
         self.assertEqual(links, ['https://youtu.be/abc', 'https://vt.tiktok.com/ZSabc/',
-                                 'https://www.instagram.com/reel/abc/?igsh=test', 'https://likee.video/v/abc'])
-        self.assertEqual([detect_source(url) for url in links], ["YouTube", "TikTok", "Instagram", "Likee"])
+                                 'https://www.instagram.com/reel/abc/?igsh=test'])
+        self.assertEqual([detect_source(url) for url in links], ["YouTube", "TikTok", "Instagram"])
 
     def test_direct_tiktok_is_canonicalized_but_short_links_are_preserved(self):
         self.assertEqual(normalize_media_url('https://tiktok.com/@creator/video/123?x=1'),
@@ -24,10 +24,6 @@ class MediaLinkTests(unittest.TestCase):
         for url in ('https://notinstagram.com/reel/abc', 'https://instagram.com.example.org/reel/abc',
                     'https://tiktok.com@elsewhere.example/video/123'):
             self.assertIsNone(detect_source(url))
-
-    def test_likee_profile_tracking_does_not_become_part_of_the_username(self):
-        self.assertEqual(normalize_media_url('https://likee.video/@creator?utm_source=share#profile'),
-                         'https://likee.video/@creator')
 
     def test_query_parameters_and_local_media_links_are_preserved(self):
         urls = ['https://www.instagram.com/p/abc/?igsh=abc&source=share', 'http://127.0.0.1:8181/test.mp4']
@@ -59,25 +55,3 @@ class MediaLinkTests(unittest.TestCase):
                     app.after_cancel(callback)
                 app.destroy()
 
-    def test_likee_notfound_explains_web_access_instead_of_claiming_deletion(self):
-        import tempfile
-        from pathlib import Path
-        from unittest.mock import patch
-        from mp3_ship_gui import MP3ShipApp
-        from youtube_to_mp3 import DownloadError
-
-        with tempfile.TemporaryDirectory() as temporary:
-            app = MP3ShipApp(settings_path=Path(temporary) / 'settings.json')
-            app.withdraw()
-            try:
-                with patch('mp3_ship_gui.download_media', side_effect=DownloadError('ERROR: [likee:user] notfound: Unable to extract user info')):
-                    app._worker_run(['https://l.likee.video/v/example'], temporary, '192', 'video', '1080')
-                app._drain_log_queue()
-                log = app.log.get('1.0', 'end')
-                self.assertIn('доступным в мобильном приложении', log)
-                self.assertIn('получить адрес видеофайла', log)
-                self.assertEqual(app.status_var.get(), app.t('failed'))
-            finally:
-                for callback in app.tk.call('after', 'info'):
-                    app.after_cancel(callback)
-                app.destroy()

@@ -8,18 +8,16 @@ SOURCE_DOMAINS = {
     "YouTube": ("youtube.com", "youtu.be", "youtube-nocookie.com"),
     "TikTok": ("tiktok.com", "tiktokv.com"),
     "Instagram": ("instagram.com",),
-    "Likee": ("likee.video", "like.video"),
 }
 SOURCE_HOME = {
     "YouTube": "https://www.youtube.com/",
     "TikTok": "https://www.tiktok.com/",
     "Instagram": "https://www.instagram.com/",
-    "Likee": "https://likee.video/",
 }
 LINK_PATTERN = re.compile(
     r'''(?ix)(?:https?://|(?<![\w@])(?:[a-z0-9-]+\.)*
     (?:youtube\.com|youtu\.be|youtube-nocookie\.com|tiktok\.com|tiktokv\.com|
-       instagram\.com|likee\.video|like\.video)/)[^\s<>"',;，]+''')
+       instagram\.com)/)[^\s<>"',;，]+''')
 
 
 def detect_source(url):
@@ -42,11 +40,17 @@ def normalize_media_url(url):
     # so the engine can resolve their redirects using the same cookie settings.
     if parsed.hostname in ("tiktok.com", "m.tiktok.com"):
         url = urlunsplit((parsed.scheme, "www.tiktok.com", parsed.path, parsed.query, parsed.fragment))
-    elif detect_source(url) == "Likee" and re.fullmatch(r"/@[^/]+/?", parsed.path):
-        # Likee's profile matcher treats a trailing query as part of the username.
-        # Profile identity is the path; share/marketing parameters are not needed.
-        url = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
     return url
+
+
+def is_supported_url(url):
+    """Restrict remote media to the advertised services; allow local fixtures."""
+    try:
+        parsed = urlsplit(url)
+        return parsed.scheme.lower() in ("http", "https") and (
+            detect_source(url) is not None or parsed.hostname in ("localhost", "127.0.0.1", "::1"))
+    except ValueError:
+        return False
 
 
 def extract_media_links(text):

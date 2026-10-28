@@ -4,7 +4,7 @@
 
 <h1 align="center">OneCorsair</h1>
 
-<p align="center">YouTube · TikTok · Instagram · Likee — видео и аудио в одном приложении для Windows.</p>
+<p align="center">YouTube · TikTok · Instagram — видео и аудио в одном приложении для Windows.</p>
 
 <p align="center">
   <a href="https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsairSetup.exe">
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <strong>Версия 1.1.0 · Windows x64 · MP3 / MP4</strong><br>
+  <strong>Версия 1.1.1 · Windows x64 · MP3 / MP4</strong><br>
   <a href="https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe">Portable EXE</a> ·
   <a href="https://github.com/dumuzeyn/OneCorsair/releases">Все версии</a> ·
   <a href="#english-version">English</a>
@@ -23,7 +23,7 @@
 
 [English version](#english-version) · [Скачать установщик](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsairSetup.exe) · [Portable EXE](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe)
 
-Автономное Windows-приложение для скачивания видео **YouTube, TikTok, Instagram и Likee** со звуком в **MP4** или извлечения аудио в **MP3**. В EXE включены yt-dlp, FFmpeg, FFprobe и Deno; отдельно устанавливать Python или другие программы не нужно.
+Автономное Windows-приложение для скачивания видео **YouTube, TikTok и Instagram** со звуком в **MP4** или извлечения аудио в **MP3**. В EXE включены yt-dlp, FFmpeg, FFprobe и Deno; отдельно устанавливать Python или другие программы не нужно.
 
 В актуальной версии доступны два формата, автоматическое обновление загрузчика, необязательный файл cookies, сохранение настроек и остановка загрузки. Компактное окно открывается по центру экрана. Новый морской логотип имеет 11 сглаженных размеров для значка окна и масштаба Windows.
 
@@ -38,7 +38,7 @@
 ### Как скачать
 
 1. Скачайте **OneCorsairSetup.exe** кнопкой выше и установите приложение. Запустите **OneCorsair** из «Пуска». Права администратора не нужны.
-2. Вставьте одну или несколько ссылок в поле **Ссылка**. Ссылки YouTube, TikTok, Instagram и Likee можно смешивать; выбирать сервис вручную не нужно. Можно вставить текст «Поделиться» из приложения. Плейлисты доступны там, где их поддерживает загрузчик.
+2. Вставьте одну или несколько ссылок в поле **Ссылка**. Ссылки YouTube, TikTok и Instagram можно смешивать; выбирать сервис вручную не нужно. Можно вставить текст «Поделиться» из приложения. Плейлисты доступны там, где их поддерживает загрузчик.
 3. Выберите папку сохранения.
 4. Выберите **Аудио · MP3** или **Видео со звуком · MP4**.
 5. Для MP3 укажите битрейт 128, 192, 256 или 320 кбит/с. Для видео — максимальное разрешение от 360p до 2160p (4K) или «Лучшее доступное». Если выбранного разрешения нет, используется доступное ниже него.
@@ -61,11 +61,9 @@
 | YouTube | `youtube.com/watch?v=…`, `youtu.be/…`, Shorts, плейлисты |
 | TikTok | `tiktok.com/@…/video/…`, `vm.tiktok.com/…`, `vt.tiktok.com/…` |
 | Instagram | `instagram.com/reel/…`, `instagram.com/p/…` с видео |
-| Likee | `likee.video/@…/video/…`, `likee.video/v/…`, `l.likee.video/v/…` |
 
 Распознавание ссылок и получение самого ролика — разные этапы: закрытый, удалённый или недоступный из текущей сети ролик может не скачаться даже при верно определённом сайте. Сервис может потребовать cookies или ограничить IP-адрес.
 
-**Ограничение Likee:** веб-ссылка может возвращать **Page Not Available**, хотя ролик доступен в мобильном приложении. При таком ответе загрузчик не получает адрес видеофайла. В версии 1.1.0 реальные загрузки TikTok и Instagram проверены; скачать проверенную короткую ссылку Likee пока не удалось.
 
 ### Как получаются аудио и видео
 
@@ -127,7 +125,7 @@ flowchart TD
 - Отдельная история для формата и качества: например, `.mp3ship_mp3_192_downloaded.txt` и `.mp3ship_mp4_1080_downloaded.txt`. Скачивание MP3 не блокирует скачивание MP4 того же ролика. Имена содержат ID видео и профиль качества, поэтому разные варианты не перезаписывают друг друга.
 - Ссылки очищаются после успешного завершения. При ошибке или отмене они сохраняются для повторной попытки.
 
-**Гарантировать скачивание любого видео всегда невозможно.** YouTube, TikTok, Instagram и Likee могут ограничить доступ, потребовать подтверждение входа или заблокировать запросы конкретной сети. Cookies помогают использовать доступ текущего аккаунта; закрытые, платные и некоторые ролики с возрастными ограничениями требуют необходимых прав. Автоматическое обновление исправляет поддерживаемые yt-dlp изменения сайта, но не отменяет эти ограничения.
+**Гарантировать скачивание любого видео всегда невозможно.** YouTube, TikTok и Instagram могут ограничить доступ, потребовать подтверждение входа или заблокировать запросы конкретной сети. Cookies помогают использовать доступ текущего аккаунта; закрытые, платные и некоторые ролики с возрастными ограничениями требуют необходимых прав. Автоматическое обновление исправляет поддерживаемые yt-dlp изменения сайта, но не отменяет эти ограничения.
 
 ### Запуск и сборка из исходников
 
@@ -192,9 +190,9 @@ python -m unittest discover -s tests -p test_media_integration.py -v
 
 [Русская версия](#русская-версия) · [Windows installer](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsairSetup.exe) · [Portable EXE](https://github.com/dumuzeyn/OneCorsair/releases/latest/download/OneCorsair.exe)
 
-OneCorsair is a self-contained Windows application for downloading **YouTube, TikTok, Instagram and Likee** videos with sound as **MP4**, or extracting audio as **MP3**. The EXE bundles yt-dlp, FFmpeg, FFprobe and Deno.
+OneCorsair is a self-contained Windows application for downloading **YouTube, TikTok and Instagram** videos with sound as **MP4**, or extracting audio as **MP3**. The EXE bundles yt-dlp, FFmpeg, FFprobe and Deno.
 
-Version 1.1.0 detects the site automatically from the **Link** field, accepts mixed share text and links without a scheme, and removes the bottom preferences caption. Settings are still remembered. Cookies help follows the linked site. Formats with missing height metadata can be downloaded without a format-selection error. The app includes a per-user Windows installer and appears in Installed apps and the Start menu, with an uninstaller, a stable icon path and a shortcut AppUserModelID matching its window. Installation uses `%LOCALAPPDATA%/Programs/OneCorsair` and does not require administrator privileges. The main download button downloads **OneCorsairSetup.exe**; **OneCorsair.exe** remains available for portable use. Old pinned entries may need to be unpinned and the installed app pinned again.
+Version 1.1.1 detects the site automatically from the **Link** field, accepts mixed share text and links without a scheme, and removes the bottom preferences caption. Settings are still remembered. Cookies help follows the linked site. Formats with missing height metadata can be downloaded without a format-selection error. The app includes a per-user Windows installer and appears in Installed apps and the Start menu, with an uninstaller, a stable icon path and a shortcut AppUserModelID matching its window. Installation uses `%LOCALAPPDATA%/Programs/OneCorsair` and does not require administrator privileges. The main download button downloads **OneCorsairSetup.exe**; **OneCorsair.exe** remains available for portable use. Old pinned entries may need to be unpinned and the installed app pinned again.
 
 The app includes automatic engine updates, optional cookies, saved preferences, cancellation, a compact centered window and a nautical logo with 11 smooth icon sizes. Native taskbar icons use sufficient resolution and follow monitor scale changes.
 

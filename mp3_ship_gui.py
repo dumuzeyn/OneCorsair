@@ -18,7 +18,7 @@ from youtube_to_mp3 import (
 
 from app_settings import load_settings, save_settings
 from windows_icon import WindowsWindowIcon
-from media_sources import SOURCE_HOME, detect_source, extract_media_links
+from media_sources import SOURCE_HOME, detect_source, extract_media_links, is_supported_url
 
 
 APP_NAME = "OneCorsair"
@@ -27,7 +27,7 @@ MAX_LOG_LINES = 800
 I18N = {
     "en": {
         "language_button": "Русский",
-        "links_hint": "YouTube · TikTok · Instagram · Likee. The site is detected automatically.",
+        "links_hint": "YouTube · TikTok · Instagram. The site is detected automatically.",
         "activity": "Download activity",
         "settings_error": "Could not save preferences: ",
         "format_hint": "MP3 audio · MP4 video",
@@ -68,7 +68,7 @@ I18N = {
         "done": "Done.",
         "download_error": "Download error: ",
         "bot_hint": "If the site requires confirmation or sign-in, choose cookies.txt exported from a signed-in session on that site. If a file is already selected, refresh it.",
-        "likee_web_unavailable": "Likee redirected this web request to Page Not Available. The video may still be accessible in the mobile app, but this link did not provide a downloadable video URL.",
+        "unsupported_site": "Supported sites: YouTube, TikTok and Instagram.",
         "error": "Error:",
         "downloading_file": "Downloading",
         "processing_file": "Processing downloaded media...",
@@ -84,7 +84,7 @@ I18N = {
     },
     "ru": {
         "language_button": "English",
-        "links_hint": "YouTube · TikTok · Instagram · Likee. Ресурс определяется автоматически.",
+        "links_hint": "YouTube · TikTok · Instagram. Ресурс определяется автоматически.",
         "activity": "Ход скачивания",
         "settings_error": "Не удалось сохранить настройки: ",
         "format_hint": "MP3 — аудио · MP4 — видео",
@@ -125,7 +125,7 @@ I18N = {
         "done": "Готово.",
         "download_error": "Ошибка скачивания: ",
         "bot_hint": "Если сервис требует подтверждение или вход, выберите cookies.txt из браузера с входом именно на этот сайт. Если файл уже выбран, обновите его.",
-        "likee_web_unavailable": "Likee перенаправил веб-запрос на Page Not Available. Ролик может оставаться доступным в мобильном приложении, но получить адрес видеофайла по этой ссылке не удалось.",
+        "unsupported_site": "Поддерживаются ссылки YouTube, TikTok и Instagram.",
         "error": "Ошибка:",
         "downloading_file": "Скачивается",
         "processing_file": "Обработка скачанных файлов...",
@@ -737,6 +737,9 @@ class MP3ShipApp(tk.Tk):
         if not urls:
             messagebox.showerror(APP_NAME, self.t("missing_links"))
             return
+        if not all(is_supported_url(url) for url in urls):
+            messagebox.showerror(APP_NAME, self.t("unsupported_site"))
+            return
         if not output:
             messagebox.showerror(APP_NAME, self.t("missing_output"))
             return
@@ -780,8 +783,6 @@ class MP3ShipApp(tk.Tk):
             self.log_queue.put("\n" + self.t("download_error") + message + "\n")
             if self._is_bot_check_error(message):
                 self.log_queue.put(self.t("bot_hint") + "\n")
-            if "notfound" in message.lower() and any(detect_source(url) == "Likee" for url in urls):
-                self.log_queue.put(self.t("likee_web_unavailable") + "\n")
         except Exception:
             outcome = "failed"
             self.log_queue.put("\n" + self.t("error") + "\n" + traceback.format_exc())
@@ -942,9 +943,9 @@ def run_self_test(report_path):
                                  capture_output=True, encoding="utf-8", errors="replace", timeout=30, check=True,
                                  creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
         names = {line.split(" ", 1)[0].casefold() for line in catalog.stdout.splitlines() if line}
-        if not {"youtube", "tiktok", "instagram", "likee"}.issubset(names):
-            raise RuntimeError("The bundled downloader does not support all four media sources.")
-        results["sources"] = ["YouTube", "TikTok", "Instagram", "Likee"]
+        if not {"youtube", "tiktok", "instagram"}.issubset(names):
+            raise RuntimeError("The bundled downloader does not support all three media sources.")
+        results["sources"] = ["YouTube", "TikTok", "Instagram"]
         results["ok"] = True
     except Exception:
         results["ok"] = False

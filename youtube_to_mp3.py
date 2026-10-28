@@ -13,7 +13,7 @@ from pathlib import Path
 
 from engine_update import UpdateCancelled, ensure_latest_engine
 from runtime_tools import install_tools
-from media_sources import detect_source, normalize_media_url
+from media_sources import detect_source, is_supported_url, normalize_media_url
 
 
 QUALITIES = ("128", "192", "256", "320")
@@ -32,7 +32,7 @@ class DownloadCancelled(DownloadError):
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Download YouTube, TikTok, Instagram and Likee media as MP3 or MP4.")
+    parser = argparse.ArgumentParser(description="Download YouTube, TikTok and Instagram media as MP3 or MP4.")
     parser.add_argument("output_dir", help="Folder where media will be saved.")
     parser.add_argument("urls", nargs="+", help="Video or playlist links.")
     parser.add_argument("--mode", choices=("audio", "video"), default="audio")
@@ -247,6 +247,8 @@ def download_media(urls, output_dir, quality="192", *, mode="audio", height="108
     urls = [normalize_media_url(url) for url in urls]
     if not urls:
         raise ValueError("At least one URL is required.")
+    if not all(is_supported_url(url) for url in urls):
+        raise DownloadError("Supported sites: YouTube, TikTok and Instagram.")
     sources = list(dict.fromkeys(source for url in urls if (source := detect_source(url))))
     if sources and report:
         report("detected_sources", sources=", ".join(sources))

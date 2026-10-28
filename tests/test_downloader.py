@@ -177,8 +177,7 @@ class DownloadTests(unittest.TestCase):
 
     def test_social_video_does_not_require_a_youtube_javascript_runtime(self):
         for url, source in (("https://www.tiktok.com/@demo/video/123", "TikTok"),
-                            ("https://instagram.com/reel/demo/", "Instagram"),
-                            ("https://likee.video/v/demo", "Likee")):
+                            ("https://instagram.com/reel/demo/", "Instagram")):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as temporary, \
                     patch.object(downloader, "configure_bundled_ffmpeg", return_value=None), \
                     patch.object(downloader, "bundled_deno_path", return_value=None), \
@@ -191,6 +190,12 @@ class DownloadTests(unittest.TestCase):
                 self.assertEqual(run.call_args.args[0][-1], url)
                 self.assertIn(("detected_sources", {"sources": source}), events)
                 self.assertNotIn("--js-runtimes", run.call_args.args[0])
+
+    def test_unsupported_remote_site_fails_before_network_or_engine_start(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(downloader, "update_engine") as update:
+            with self.assertRaisesRegex(downloader.DownloadError, "Supported sites:"):
+                downloader.download_media(["https://example.net/video/123"], temporary)
+            update.assert_not_called()
 
     def test_cancel_during_first_runtime_install_stops_before_engine_update(self):
         cancel = threading.Event()

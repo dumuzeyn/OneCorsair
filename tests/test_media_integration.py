@@ -87,7 +87,7 @@ class MediaIntegrationTests(unittest.TestCase):
                 # resolution must not make these otherwise playable files fail.
                 info.write_text(json.dumps({
                     "id": "social-no-height", "title": "Social video without height",
-                    "extractor": "likee", "extractor_key": "Likee", "webpage_url": base + "/test.mp4",
+                    "extractor": "generic", "extractor_key": "Generic", "webpage_url": base + "/test.mp4",
                     "formats": [{"format_id": "social", "url": base + "/test.mp4", "ext": "mp4",
                                  "vcodec": "h264", "acodec": "aac"}],
                 }), encoding="utf-8")
