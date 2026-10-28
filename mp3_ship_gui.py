@@ -68,6 +68,7 @@ I18N = {
         "done": "Done.",
         "download_error": "Download error: ",
         "bot_hint": "If the site requires confirmation or sign-in, choose cookies.txt exported from a signed-in session on that site. If a file is already selected, refresh it.",
+        "likee_web_unavailable": "Likee redirected this web request to Page Not Available. The video may still be accessible in the mobile app, but this link did not provide a downloadable video URL.",
         "error": "Error:",
         "downloading_file": "Downloading",
         "processing_file": "Processing downloaded media...",
@@ -124,6 +125,7 @@ I18N = {
         "done": "Готово.",
         "download_error": "Ошибка скачивания: ",
         "bot_hint": "Если сервис требует подтверждение или вход, выберите cookies.txt из браузера с входом именно на этот сайт. Если файл уже выбран, обновите его.",
+        "likee_web_unavailable": "Likee перенаправил веб-запрос на Page Not Available. Ролик может оставаться доступным в мобильном приложении, но получить адрес видеофайла по этой ссылке не удалось.",
         "error": "Ошибка:",
         "downloading_file": "Скачивается",
         "processing_file": "Обработка скачанных файлов...",
@@ -778,6 +780,8 @@ class MP3ShipApp(tk.Tk):
             self.log_queue.put("\n" + self.t("download_error") + message + "\n")
             if self._is_bot_check_error(message):
                 self.log_queue.put(self.t("bot_hint") + "\n")
+            if "notfound" in message.lower() and any(detect_source(url) == "Likee" for url in urls):
+                self.log_queue.put(self.t("likee_web_unavailable") + "\n")
         except Exception:
             outcome = "failed"
             self.log_queue.put("\n" + self.t("error") + "\n" + traceback.format_exc())

@@ -58,3 +58,26 @@ class MediaLinkTests(unittest.TestCase):
                 for callback in app.tk.call('after', 'info'):
                     app.after_cancel(callback)
                 app.destroy()
+
+    def test_likee_notfound_explains_web_access_instead_of_claiming_deletion(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from mp3_ship_gui import MP3ShipApp
+        from youtube_to_mp3 import DownloadError
+
+        with tempfile.TemporaryDirectory() as temporary:
+            app = MP3ShipApp(settings_path=Path(temporary) / 'settings.json')
+            app.withdraw()
+            try:
+                with patch('mp3_ship_gui.download_media', side_effect=DownloadError('ERROR: [likee:user] notfound: Unable to extract user info')):
+                    app._worker_run(['https://l.likee.video/v/example'], temporary, '192', 'video', '1080')
+                app._drain_log_queue()
+                log = app.log.get('1.0', 'end')
+                self.assertIn('доступным в мобильном приложении', log)
+                self.assertIn('получить адрес видеофайла', log)
+                self.assertEqual(app.status_var.get(), app.t('failed'))
+            finally:
+                for callback in app.tk.call('after', 'info'):
+                    app.after_cancel(callback)
+                app.destroy()
