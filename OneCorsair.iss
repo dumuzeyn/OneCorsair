@@ -1,6 +1,6 @@
 ; Per-user Windows installation; build with Inno Setup 7 ISCC.exe.
 #define AppName "OneCorsair"
-#define AppVersion "1.0.2"
+#define AppVersion "1.1.0"
 #define AppUserModelID "OneCorsair.Downloader"
 
 [Setup]

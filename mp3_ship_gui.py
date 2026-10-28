@@ -1,6 +1,5 @@
 import json
 import queue
-import re
 import sys
 import subprocess
 import threading
@@ -19,25 +18,25 @@ from youtube_to_mp3 import (
 
 from app_settings import load_settings, save_settings
 from windows_icon import WindowsWindowIcon
+from media_sources import SOURCE_HOME, detect_source, extract_media_links
 
 
 APP_NAME = "OneCorsair"
 MAX_LOG_LINES = 800
-URL_PATTERN = re.compile(r"https?://[^\s,;]+")
 
 I18N = {
     "en": {
         "language_button": "Русский",
-        "links_hint": "Paste one or several video or playlist links.",
+        "links_hint": "YouTube · TikTok · Instagram · Likee. The site is detected automatically.",
         "activity": "Download activity",
-        "preferences_saved": "Your folder, quality and cookies file are remembered.",
         "settings_error": "Could not save preferences: ",
         "format_hint": "MP3 audio · MP4 video",
         "idle_detail": "Waiting for a link",
         "complete_detail": "Files are ready",
         "progress_detail": "{percent} · {speed}",
         "download": "↓ Download",
-        "links": "YouTube links",
+        "links": "Link",
+        "detected_sources": "Detected: {sources}.",
         "save_to": "Save to",
         "browse": "Browse",
         "mode": "Format",
@@ -58,8 +57,8 @@ I18N = {
         "cookies_help_title": "How to get cookies.txt",
         "choose_cookies_file": "Choose cookies.txt",
         "invalid_cookies": "The selected cookies.txt file does not exist. Choose an existing file or clear the field.",
-        "cookies_help_text": "1. Open YouTube in Chrome and sign in.\n2. Install a cookies.txt exporter from the Chrome Web Store.\n3. On youtube.com, export cookies in Netscape cookies.txt format.\n4. Press Choose beside cookies.txt and select the exported file.\n\nAfter closing this tip, YouTube and the extension store will open in your browser. Leave the cookies field empty to download without cookies.",
-        "missing_links": "Paste at least one YouTube link.",
+        "cookies_help_text": "1. Open {site} in Chrome and sign in if needed.\n2. Install a cookies.txt exporter from the Chrome Web Store.\n3. Export cookies for that site in Netscape cookies.txt format.\n4. Press Choose beside cookies.txt and select the exported file.\n\nAfter closing this tip, the site and the extension store will open in your browser. Leave the cookies field empty to download without cookies.",
+        "missing_links": "Paste at least one video link.",
         "missing_output": "Choose an output folder.",
         "choose_output": "Choose output folder",
         "downloading": "Downloading...",
@@ -68,7 +67,7 @@ I18N = {
         "stopped": "Download stopped.",
         "done": "Done.",
         "download_error": "Download error: ",
-        "bot_hint": "YouTube requires confirmation or sign-in. Choose a cookies.txt file exported from a signed-in YouTube session and try again. If one is already selected, refresh that file.",
+        "bot_hint": "If the site requires confirmation or sign-in, choose cookies.txt exported from a signed-in session on that site. If a file is already selected, refresh it.",
         "error": "Error:",
         "downloading_file": "Downloading",
         "processing_file": "Processing downloaded media...",
@@ -84,16 +83,16 @@ I18N = {
     },
     "ru": {
         "language_button": "English",
-        "links_hint": "Вставьте одну или несколько ссылок на ролики или плейлисты.",
+        "links_hint": "YouTube · TikTok · Instagram · Likee. Ресурс определяется автоматически.",
         "activity": "Ход скачивания",
-        "preferences_saved": "Папка, качество и файл cookies запоминаются.",
         "settings_error": "Не удалось сохранить настройки: ",
         "format_hint": "MP3 — аудио · MP4 — видео",
         "idle_detail": "Ожидание ссылки",
         "complete_detail": "Файлы готовы",
         "progress_detail": "{percent} · {speed}",
         "download": "↓ Скачать",
-        "links": "Ссылки YouTube",
+        "links": "Ссылка",
+        "detected_sources": "Ресурс: {sources}.",
         "save_to": "Сохранить в",
         "browse": "Обзор",
         "mode": "Формат",
@@ -114,8 +113,8 @@ I18N = {
         "cookies_help_title": "Как получить cookies.txt",
         "choose_cookies_file": "Выберите cookies.txt",
         "invalid_cookies": "Выбранный файл cookies.txt не существует. Выберите существующий файл или очистите поле.",
-        "cookies_help_text": "1. Откройте YouTube в Chrome и войдите в аккаунт.\n2. Установите расширение для экспорта cookies.txt из Chrome Web Store.\n3. На youtube.com экспортируйте cookies в формате Netscape cookies.txt.\n4. Нажмите «Выбрать» рядом с cookies.txt и укажите этот файл.\n\nПосле закрытия подсказки в браузере откроются YouTube и магазин расширений. Для скачивания без cookies оставьте поле пустым.",
-        "missing_links": "Вставьте хотя бы одну ссылку YouTube.",
+        "cookies_help_text": "1. Откройте {site} в Chrome и при необходимости войдите в аккаунт.\n2. Установите расширение для экспорта cookies.txt из Chrome Web Store.\n3. Экспортируйте cookies именно этого сайта в формате Netscape cookies.txt.\n4. Нажмите «Выбрать» рядом с cookies.txt и укажите этот файл.\n\nПосле закрытия подсказки откроются сайт и магазин расширений. Для скачивания без cookies оставьте поле пустым.",
+        "missing_links": "Вставьте хотя бы одну ссылку на видео.",
         "missing_output": "Выберите папку для сохранения.",
         "choose_output": "Выберите папку для сохранения",
         "downloading": "Скачивание...",
@@ -124,7 +123,7 @@ I18N = {
         "stopped": "Скачивание остановлено.",
         "done": "Готово.",
         "download_error": "Ошибка скачивания: ",
-        "bot_hint": "YouTube требует подтверждение или вход. Выберите cookies.txt, экспортированный из браузера с входом в YouTube, и попробуйте снова. Если файл уже выбран, обновите его.",
+        "bot_hint": "Если сервис требует подтверждение или вход, выберите cookies.txt из браузера с входом именно на этот сайт. Если файл уже выбран, обновите его.",
         "error": "Ошибка:",
         "downloading_file": "Скачивается",
         "processing_file": "Обработка скачанных файлов...",
@@ -500,8 +499,6 @@ class MP3ShipApp(tk.Tk):
         scrollbar = ttk.Scrollbar(log_frame, command=self.log.yview)
         scrollbar.grid(row=3, column=1, sticky="ns")
         self.log.configure(yscrollcommand=scrollbar.set)
-        self.footer_label = self._localized(root, "preferences_saved", "Muted.TLabel")
-        self.footer_label.grid(row=3, column=0, sticky="w", pady=(6, 0))
 
     def _resize_window(self, event):
         if event.widget is not self:
@@ -646,8 +643,9 @@ class MP3ShipApp(tk.Tk):
         self._save_preferences()
 
     def _show_cookies_help(self):
-        messagebox.showinfo(self.t("cookies_help_title"), self.t("cookies_help_text"), parent=self)
-        webbrowser.open("https://www.youtube.com/")
+        site = next((source for url in self._extract_urls() if (source := detect_source(url))), "YouTube")
+        messagebox.showinfo(self.t("cookies_help_title"), self.t("cookies_help_text").format(site=site), parent=self)
+        webbrowser.open(SOURCE_HOME[site])
         webbrowser.open("https://chromewebstore.google.com/search/cookies.txt")
 
     def _change_mode(self, _event=None):
@@ -727,9 +725,7 @@ class MP3ShipApp(tk.Tk):
             self.destroy()
 
     def _extract_urls(self):
-        text = self.urls_text.get("1.0", tk.END)
-        urls = URL_PATTERN.findall(text)
-        return [url.rstrip(").]}>\"'") for url in urls]
+        return extract_media_links(self.urls_text.get("1.0", tk.END))
 
     def _run(self):
         if self.worker and self.worker.is_alive():
@@ -880,7 +876,7 @@ class MP3ShipApp(tk.Tk):
 
     def _is_bot_check_error(self, message):
         lowered = message.lower()
-        return "not a bot" in lowered or "sign in to confirm" in lowered or "cookies" in lowered
+        return any(hint in lowered for hint in ("not a bot", "sign in", "log in", "login", "cookies"))
 
     def _toggle_language(self):
         self.language = "en" if self.language == "ru" else "ru"
@@ -938,6 +934,13 @@ def run_self_test(report_path):
                                     errors="replace", timeout=30, check=True,
                                     creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
             results[name] = result.stdout.splitlines()[0]
+        catalog = subprocess.run([str(binaries["yt-dlp"]), "--ignore-config", "--no-plugin-dirs", "--list-extractors"],
+                                 capture_output=True, encoding="utf-8", errors="replace", timeout=30, check=True,
+                                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+        names = {line.split(" ", 1)[0].casefold() for line in catalog.stdout.splitlines() if line}
+        if not {"youtube", "tiktok", "instagram", "likee"}.issubset(names):
+            raise RuntimeError("The bundled downloader does not support all four media sources.")
+        results["sources"] = ["YouTube", "TikTok", "Instagram", "Likee"]
         results["ok"] = True
     except Exception:
         results["ok"] = False

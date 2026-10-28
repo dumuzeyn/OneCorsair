@@ -148,7 +148,7 @@ class DownloadTests(unittest.TestCase):
         command = self.command("video", "720")
         formats = command[command.index("--format") + 1]
         for option in formats.split("/"):
-            self.assertIn("[height<=720]", option)
+            self.assertIn("[height<=?720]", option)
         self.assertIn("+ba[ext=m4a]", formats)
         self.assertNotIn("--extract-audio", command)
         self.assertEqual(command[command.index("--merge-output-format") + 1], "mp4")
@@ -174,6 +174,23 @@ class DownloadTests(unittest.TestCase):
                 downloader.download_media(["https://youtu.be/test"], temporary,
                                           cookies_file=Path(temporary) / "missing.txt")
             update.assert_not_called()
+
+    def test_social_video_does_not_require_a_youtube_javascript_runtime(self):
+        for url, source in (("https://www.tiktok.com/@demo/video/123", "TikTok"),
+                            ("https://instagram.com/reel/demo/", "Instagram"),
+                            ("https://likee.video/v/demo", "Likee")):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(downloader, "configure_bundled_ffmpeg", return_value=None), \
+                    patch.object(downloader, "bundled_deno_path", return_value=None), \
+                    patch.object(downloader.shutil, "which", side_effect=lambda name: name if name in ("ffmpeg", "ffprobe") else None), \
+                    patch.object(downloader, "update_engine", return_value=updater.Engine(Path("yt-dlp.exe"), "test")), \
+                    patch.object(downloader, "run_command", return_value=0) as run:
+                events = []
+                downloader.download_media([url], temporary, mode="video",
+                                          report=lambda key, **values: events.append((key, values)))
+                self.assertEqual(run.call_args.args[0][-1], url)
+                self.assertIn(("detected_sources", {"sources": source}), events)
+                self.assertNotIn("--js-runtimes", run.call_args.args[0])
 
     def test_cancel_during_first_runtime_install_stops_before_engine_update(self):
         cancel = threading.Event()

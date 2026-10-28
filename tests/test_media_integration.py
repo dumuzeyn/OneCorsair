@@ -83,6 +83,20 @@ class MediaIntegrationTests(unittest.TestCase):
                 downloader.run_command(command, report=report)
                 merged = next(output.glob("*merge-fixture*.mp4"))
                 self.assertEqual({stream["codec_type"] for stream in self.probe(merged)["streams"]}, {"video", "audio"})
+                # Social-video extractors may not supply a height. A maximum
+                # resolution must not make these otherwise playable files fail.
+                info.write_text(json.dumps({
+                    "id": "social-no-height", "title": "Social video without height",
+                    "extractor": "likee", "extractor_key": "Likee", "webpage_url": base + "/test.mp4",
+                    "formats": [{"format_id": "social", "url": base + "/test.mp4", "ext": "mp4",
+                                 "vcodec": "h264", "acodec": "aac"}],
+                }), encoding="utf-8")
+                command = downloader.build_command(downloader.bundled_engine_path(), [], output,
+                                                   mode="video", height="720")
+                command[-1:-1] = ["--load-info-json", str(info)]
+                downloader.run_command(command, report=report)
+                social = next(output.glob("*social-no-height*.mp4"))
+                self.assertEqual({stream["codec_type"] for stream in self.probe(social)["streams"]}, {"video", "audio"})
                 self.assertTrue(any(key == "saved_file" for key, _values in events))
                 cookies = directory / "test cookies.txt"
                 cookies.write_text("# Netscape HTTP Cookie File\n"

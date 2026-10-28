@@ -13,6 +13,7 @@ from pathlib import Path
 
 from engine_update import UpdateCancelled, ensure_latest_engine
 from runtime_tools import install_tools
+from media_sources import detect_source, normalize_media_url
 
 
 QUALITIES = ("128", "192", "256", "320")
@@ -31,7 +32,7 @@ class DownloadCancelled(DownloadError):
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Download YouTube audio (MP3) or video (MP4), optionally using cookies.")
+    parser = argparse.ArgumentParser(description="Download YouTube, TikTok, Instagram and Likee media as MP3 or MP4.")
     parser.add_argument("output_dir", help="Folder where media will be saved.")
     parser.add_argument("urls", nargs="+", help="Video or playlist links.")
     parser.add_argument("--mode", choices=("audio", "video"), default="audio")
@@ -134,18 +135,20 @@ def build_command(engine, urls, output_path, quality="192", mode="audio", height
     deno = bundled_deno_path()
     if deno:
         command.extend(["--js-runtimes", f"deno:{deno}"])
-    else:
-        # Deno is enabled by default; Node is a fallback for source installations.
+    elif shutil.which("node"):
+        # System Deno is enabled by default; use Node only when it is available.
         command.extend(["--js-runtimes", "node"])
     if mode == "audio":
         command.extend(["--format", "bestaudio/best", "--extract-audio",
                         "--audio-format", "mp3", "--audio-quality", quality])
     else:
-        cap = "" if height == "best" else f"[height<={height}]"
+        # Some social-video formats have no height metadata. Keep those eligible
+        # while still rejecting known resolutions above the selected limit.
+        cap = "" if height == "best" else f"[height<=?{height}]"
         formats = f"bv[ext=mp4]{cap}+ba[ext=m4a]/b[ext=mp4]{cap}/bv{cap}+ba/b{cap}"
         command.extend(["--format", formats, "--format-sort", "res,vcodec:h264,acodec:aac",
                         "--merge-output-format", "mp4", "--recode-video", "mp4"])
-    command.extend(["--", *urls])
+    command.extend(["--", *(normalize_media_url(url) for url in urls)])
     return command
 
 
@@ -241,17 +244,20 @@ def download_media(urls, output_dir, quality="192", *, mode="audio", height="108
         raise ValueError("Choose either a cookies file or browser cookies.")
     if cookies_file and not Path(cookies_file).expanduser().is_file():
         raise DownloadError("The selected cookies.txt file does not exist.")
+    urls = [normalize_media_url(url) for url in urls]
+    if not urls:
+        raise ValueError("At least one URL is required.")
+    sources = list(dict.fromkeys(source for url in urls if (source := detect_source(url))))
+    if sources and report:
+        report("detected_sources", sources=", ".join(sources))
     try:
         configure_bundled_ffmpeg(cancel_event=cancel_event)
         if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
             raise DownloadError("FFmpeg and FFprobe are required. Use the bundled OneCorsair.exe or install both in PATH.")
-        if not bundled_deno_path(cancel_event=cancel_event) and not (shutil.which("deno") or shutil.which("node")):
+        if "YouTube" in sources and not bundled_deno_path(cancel_event=cancel_event) and not (shutil.which("deno") or shutil.which("node")):
             raise DownloadError("Deno is required for YouTube. Use the bundled OneCorsair.exe or install Deno.")
     except UpdateCancelled as error:
         raise DownloadCancelled(str(error)) from error
-    urls = list(urls)
-    if not urls:
-        raise ValueError("At least one URL is required.")
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     engine = update_engine(force=force_update, cancel_event=cancel_event, report=report)
